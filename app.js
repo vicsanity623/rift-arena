@@ -349,6 +349,7 @@ function refreshHome(){
   document.getElementById("home-vp").textContent = formatNum(save.vp) + " VP";
   updateExploreDash();
   updateDojoDash();
+  updateTourneyDashboard();
 }
 
 setInterval(() => {
@@ -389,9 +390,58 @@ document.getElementById("card-bag").addEventListener("click", ()=>{ initBagUI();
 document.getElementById("card-shop").addEventListener("click", ()=>{ initShopUI(); show("screen-shop"); });
 document.getElementById("card-dojo").addEventListener("click", ()=>{ initDojoUI(); show("screen-dojo"); });
 
-document.getElementById("card-battle").addEventListener("click", ()=>{ buildSelectGrid(); show("screen-select"); });
+document.getElementById("card-battle").addEventListener("click", ()=>{
+  if (save.mons.filter(m => !m.onExpedition).length < 3) return alert("You need at least 3 Rift-forms available to battle.");
+  buildSelectGrid(); 
+  show("screen-select"); 
+  document.getElementById("btn-confirm-team").textContent = "Find Ranked Match";
+  document.getElementById("btn-survival-team").style.display = "";
+  document.getElementById("btn-tournament-team").style.display = "";
+});
+document.getElementById("card-battle").addEventListener("contextmenu", (e)=>{
+  e.preventDefault();
+  buildSelectGrid();
+  show("screen-select");
+  document.getElementById("btn-confirm-team").textContent = "Find Ranked Match";
+  document.getElementById("btn-survival-team").style.display = "";
+  document.getElementById("btn-tournament-team").style.display = "";
+});
 document.getElementById("card-roster").addEventListener("click", ()=>{ buildRosterView(); show("screen-roster"); });
 document.getElementById("card-quests").addEventListener("click", ()=>{ initQuestsUI(); show("screen-quests"); });
+function showTournamentInfo() {
+  const container = document.getElementById("tournament-content");
+  const gemsHave = save.gems;
+  container.innerHTML = `
+    <div class="tourney-card highlight">
+      <div class="tourney-header">
+        <div class="tourney-name">🏆 Rift Cup</div>
+        <div class="tourney-prize">🥇 500 🪙 · 100 💎</div>
+      </div>
+      <div class="tourney-desc">4-player bracket tournament. Select 3 Rift-forms and battle through semi-finals and finals!</div>
+      <div class="tourney-desc" style="color:var(--gold);">Entry Fee: 50 💎 (You have ${gemsHave})</div>
+      <div class="tourney-desc" style="font-size:11px; color:var(--text-dim);">
+        Prizes: 1st: 500🪙+100💎 · 2nd: 250🪙+40💎 · 3rd: 125🪙+20💎 · 4th: 50🪙+5💎
+      </div>
+      <button class="btn gold" id="btn-enter-tourney" style="margin-top:8px;" ${gemsHave < 50 ? 'disabled' : ''}>${gemsHave < 50 ? 'Not enough Gems' : 'Select Team →'}</button>
+      <button class="btn ghost" data-back="screen-home" style="margin-top:4px;">Back</button>
+    </div>
+  `;
+  document.getElementById("btn-enter-tourney").onclick = () => {
+    if (save.gems < 50) return alert(`Not enough Gems! Need 50 💎.`);
+    buildSelectGrid();
+    battleMode = "tournament";
+    document.getElementById("btn-tournament-team").style.display = "none";
+    document.getElementById("btn-survival-team").style.display = "none";
+    document.getElementById("btn-confirm-team").textContent = "Enter Tournament (50💎)";
+    show("screen-select");
+  };
+  show("screen-tournament");
+}
+
+document.getElementById("card-tournament").addEventListener("click", () => {
+  if (save.mons.filter(m => !m.onExpedition).length < 3) return alert("You need at least 3 Rift-forms available.");
+  showTournamentInfo();
+});
 refreshHome();
 
 /* ============================= ROSTER & DETAILS ============================= */
@@ -477,12 +527,20 @@ function showMonDetails(m) {
 
 /* ============================= TEAM SELECT ============================= */
 let pickOrder = [];
+let battleMode = "ranked"; // "ranked", "survival", "tournament"
 
 function buildSelectGrid(){
+  battleMode = "ranked";
   pickOrder = [];
   const grid = document.getElementById("select-grid");
   grid.innerHTML = "";
   
+  // Reset button visibility
+  const survBtn = document.getElementById("btn-survival-team");
+  if (survBtn) survBtn.style.display = "";
+  const tourneyBtn = document.getElementById("btn-tournament-team");
+  if (tourneyBtn) tourneyBtn.style.display = "";
+
   save.mons.forEach(mSave => {
     if(mSave.onExpedition) return; // Hide exploring mons
     const m = getMonData(mSave.uid);
@@ -516,22 +574,323 @@ function togglePick(uid, card){
 
 function updateConfirmBtn(){
   const btn = document.getElementById("btn-confirm-team");
-  btn.textContent = `Confirm Team (${pickOrder.length}/3)`;
+  btn.textContent = `Find Ranked Match (${pickOrder.length}/3)`;
   btn.disabled = pickOrder.length !== 3;
   const survBtn = document.getElementById("btn-survival-team");
   survBtn.textContent = `Survival Mode (${pickOrder.length}/3)`;
   survBtn.disabled = pickOrder.length !== 3;
+  const tourneyBtn = document.getElementById("btn-tournament-team");
+  if (tourneyBtn) {
+    tourneyBtn.textContent = `Tournament (${pickOrder.length}/3)`;
+    tourneyBtn.disabled = pickOrder.length !== 3;
+  }
 }
 
 document.getElementById("btn-confirm-team").addEventListener("click", ()=>{
   if(pickOrder.length !== 3) return;
-  startPrep(pickOrder.slice());
+  if (battleMode === "tournament") {
+    startTournamentMode(pickOrder.slice());
+  } else {
+    startMatchmaking(pickOrder.slice());
+  }
+  battleMode = "ranked";
 });
 
 document.getElementById("btn-survival-team").addEventListener("click", ()=>{
   if(pickOrder.length !== 3) return;
   startSurvivalMode();
 });
+
+document.getElementById("btn-tournament-team").addEventListener("click", ()=>{
+  if(pickOrder.length !== 3) return;
+  startTournamentMode(pickOrder.slice());
+});
+
+/* ============================= MATCHMAKING QUEUE ============================= */
+let matchmakingTimer = null;
+let matchmakingCancelled = false;
+
+function startMatchmaking(playerUids) {
+  const pData = playerUids.map(uid => getMonData(uid));
+  const avgLevel = Math.max(1, Math.floor(pData.reduce((s, m) => s + m.level, 0) / 3));
+  const playerVP = save.vp;
+
+  document.getElementById("queue-timer").textContent = "00:00";
+  document.getElementById("queue-sub").textContent = "Searching the arena for a worthy opponent...";
+  document.getElementById("queue-rank-range").textContent = `Your VP: ${formatNum(playerVP)}`;
+  show("screen-queue");
+
+  const queueStart = Date.now();
+  const searchTime = 3000 + Math.random() * 4000;
+
+  matchmakingCancelled = false;
+  clearInterval(matchmakingTimer);
+  matchmakingTimer = setInterval(() => {
+    const elapsed = Math.floor((Date.now() - queueStart) / 1000);
+    const m = Math.floor(elapsed / 60);
+    const s = elapsed % 60;
+    document.getElementById("queue-timer").textContent = String(m).padStart(2,"0") + ":" + String(s).padStart(2,"0");
+
+    if (elapsed % 3 === 0) {
+      const msgs = [
+        "Scanning nearby rift signatures...",
+        "Evaluating opponent ranking...",
+        "Checking arena availability...",
+        "Calibrating match balance...",
+        "Opponent found! Authenticating...",
+        "Establishing rift connection..."
+      ];
+      document.getElementById("queue-sub").textContent = msgs[Math.floor(Math.random() * msgs.length)];
+    }
+  }, 1000);
+
+  setTimeout(() => {
+    if (matchmakingCancelled) return;
+    clearInterval(matchmakingTimer);
+    document.getElementById("queue-sub").textContent = "Match found!";
+
+    // Build opponent based on VP matchmaking
+    const vpDiff = Math.floor((Math.random() - 0.5) * 400);
+    const oppVP = Math.max(500, playerVP + vpDiff);
+    const oppRank = rankForVP(oppVP);
+    const oppLvl = Math.max(1, avgLevel + Math.floor((oppVP - playerVP) / 200));
+
+    const trainer = TRAINER_TEMPLATES[Math.floor(Math.random() * TRAINER_TEMPLATES.length)];
+    let oppIds;
+    if (trainer.theme) {
+      const themes = trainer.theme.includes("+") ? trainer.theme.split("+") : [trainer.theme];
+      let pool = [];
+      themes.forEach(t => { if (THEMED_ROSTER[t]) pool = pool.concat(THEMED_ROSTER[t]); });
+      pool = [...new Set(pool)].sort(() => Math.random() - 0.5);
+      const fromTheme = [...pool];
+      while (fromTheme.length < 3) {
+        const extra = ROSTER_DEF.map(r=>r[0]).sort(()=>Math.random()-0.5).filter(id => !fromTheme.includes(id));
+        fromTheme.push(extra[0]);
+      }
+      oppIds = fromTheme;
+    } else {
+      oppIds = ROSTER_DEF.map(r=>r[0]).sort(()=>Math.random()-0.5).slice(0, 3);
+    }
+
+    document.getElementById("prep-foe-name").textContent = trainer.name;
+    startPrepWithData(playerUids, oppIds, oppLvl, trainer, oppRank);
+  }, searchTime);
+}
+
+function cancelMatchmaking() {
+  matchmakingCancelled = true;
+  clearInterval(matchmakingTimer);
+  buildSelectGrid();
+  show("screen-select");
+}
+
+document.getElementById("btn-cancel-queue").addEventListener("click", cancelMatchmaking);
+
+document.getElementById("btn-tourney-leave").addEventListener("click", () => {
+  tournamentState = null;
+  refreshHome();
+  show("screen-home");
+});
+
+/* ============================= TOURNAMENT MODE ============================= */
+let tournamentState = null;
+
+function startTournamentMode(playerUids) {
+  const entryFee = 50;
+  if (save.gems < entryFee) return alert(`Tournament entry requires ${entryFee} Gems. You have ${save.gems}.`);
+
+  const pData = playerUids.map(uid => getMonData(uid));
+  const avgLevel = Math.max(1, Math.floor(pData.reduce((s, m) => s + m.level, 0) / 3));
+
+  save.gems -= entryFee;
+  trackQuestProgress("earn_gold", 0);
+  saveGame();
+
+  // Generate 3 AI opponents for 4-player bracket
+  const opponents = [];
+  const usedNames = new Set();
+  for (let i = 0; i < 3; i++) {
+    let trainer;
+    do { trainer = TRAINER_TEMPLATES[Math.floor(Math.random() * TRAINER_TEMPLATES.length)]; }
+    while (usedNames.has(trainer.name));
+    usedNames.add(trainer.name);
+
+    let oppIds;
+    if (trainer.theme) {
+      const themes = trainer.theme.includes("+") ? trainer.theme.split("+") : [trainer.theme];
+      let pool = [];
+      themes.forEach(t => { if (THEMED_ROSTER[t]) pool = pool.concat(THEMED_ROSTER[t]); });
+      pool = [...new Set(pool)].sort(() => Math.random() - 0.5);
+      const fromTheme = [...pool];
+      while (fromTheme.length < 3) {
+        const extra = ROSTER_DEF.map(r=>r[0]).sort(()=>Math.random()-0.5).filter(id => !fromTheme.includes(id));
+        fromTheme.push(extra[0]);
+      }
+      oppIds = fromTheme;
+    } else {
+      oppIds = ROSTER_DEF.map(r=>r[0]).sort(()=>Math.random()-0.5).slice(0, 3);
+    }
+
+    opponents.push({
+      trainer: trainer,
+      ids: oppIds,
+      level: avgLevel + Math.floor(i * 0.5),
+      alive: true
+    });
+  }
+
+  tournamentState = {
+    playerUids: playerUids,
+    bracket: [
+      { round: "semi", match: 0, p1: "player", p2: 0, winner: null, loser: null, done: false },
+      { round: "semi", match: 1, p1: 1, p2: 2, winner: null, loser: null, done: false },
+      { round: "final", match: 0, p1: null, p2: null, winner: null, loser: null, done: false },
+      { round: "third", match: 0, p1: null, p2: null, winner: null, loser: null, done: false }
+    ],
+    opponents: opponents,
+    playerAlive: true,
+    entryFee: entryFee
+  };
+
+  showTourneyBracket();
+}
+
+function showTourneyBracket() {
+  const container = document.getElementById("bracket-view");
+  container.innerHTML = "";
+
+  const roundLabel = tournamentState.bracket.every(m => m.done) ? "Tournament Results" : 
+                     tournamentState.bracket[0].done ? "Finals & 3rd Place" : "Semi-Finals";
+
+  document.getElementById("tourney-title").textContent = roundLabel;
+  show("screen-tournament-bracket");
+
+  let html = `<div class="bracket-round-label">${roundLabel}</div>`;
+
+  tournamentState.bracket.forEach((match, idx) => {
+    if (match.round === "third" && !tournamentState.bracket[1].done) return;
+
+    const isPlayerMatch = match.p1 === "player" || match.p2 === "player";
+    const canPlay = !match.done && isPlayerMatch && tournamentState.playerAlive;
+
+    html += `<div class="bracket-match ${canPlay ? 'live' : ''} ${match.done ? 'completed' : ''}">`;
+
+    const slots = [
+      { id: match.p1, winner: match.winner, loser: match.loser },
+      { id: match.p2, winner: match.winner, loser: match.loser }
+    ];
+
+    slots.forEach((slot, si) => {
+      const isPlayer = slot.id === "player";
+      const isOpp = typeof slot.id === "number";
+
+      let name = "", won = false, lost = false;
+      if (isPlayer) {
+        name = "You";
+        won = match.winner === "player";
+        lost = match.loser === "player";
+      } else if (isOpp && tournamentState.opponents[slot.id]) {
+        name = tournamentState.opponents[slot.id].trainer.name;
+        won = match.winner === slot.id;
+        lost = match.loser === slot.id;
+      } else if (slot.id === null) {
+        name = "TBD";
+      }
+
+      const cls = won ? "winner" : lost ? "loser" : "";
+      html += `<div class="bracket-team ${cls}"><span class="name">${name}</span>${won ? '<span class="score">✓</span>' : lost ? '<span class="score">✗</span>' : ''}</div>`;
+      if (si === 0) html += `<div class="bracket-vs">VS</div>`;
+    });
+
+    if (canPlay) {
+      html += `<button class="btn gold" id="btn-play-tourney-${idx}" style="margin-top:8px;">FIGHT</button>`;
+    } else if (match.done && match.round === "final") {
+      html += `<div style="text-align:center; font-size:13px; color:var(--gold); margin-top:6px;">Champion: ${match.winner === "player" ? "You!" : tournamentState.opponents[match.winner]?.trainer.name}</div>`;
+    }
+
+    html += `</div>`;
+  });
+
+  container.innerHTML = html;
+
+  // Attach fight handlers
+  tournamentState.bracket.forEach((match, idx) => {
+    const btn = document.getElementById("btn-play-tourney-" + idx);
+    if (btn) {
+      btn.onclick = () => startTourneyMatch(idx);
+    }
+  });
+
+  updateTourneyDashboard();
+}
+
+function startTourneyMatch(matchIdx) {
+  const match = tournamentState.bracket[matchIdx];
+  if (!match || match.done) return;
+
+  let playerUids, aiOpp;
+  if (match.p1 === "player") {
+    playerUids = tournamentState.playerUids;
+    aiOpp = tournamentState.opponents[match.p2];
+  } else if (match.p2 === "player") {
+    playerUids = tournamentState.playerUids;
+    aiOpp = tournamentState.opponents[match.p1];
+  } else {
+    // AI vs AI - auto-resolve (unlikely to reach here)
+    match.done = true;
+    match.winner = match.p1;
+    match.loser = match.p2;
+    showTourneyBracket();
+    return;
+  }
+
+  // Reset player mons for the match
+  const pData = playerUids.map(uid => {
+    const m = getMonData(uid);
+    m.effDef = Math.round(m.def * (m.item === "ironscale" ? 1.15 : 1));
+    m.hp = m.baseHp; m.itemUsed = false; m.fainted = false;
+    m.statusEffects = []; m.statusAtkMult = 1; m.statusSkipTurns = 0;
+    return m;
+  });
+
+  const foe = aiOpp.ids.map(id => instantiateFoe(id, aiOpp.level));
+  const avgPLevel = Math.max(1, Math.floor(pData.reduce((sum, m) => sum + m.level, 0) / 3));
+
+  battle = {
+    player: pData,
+    foe: foe,
+    pIndex: 0, fIndex: 0,
+    opponentName: aiOpp.trainer.name,
+    personality: aiOpp.trainer.personality,
+    over: false,
+    tournament: { matchIdx: matchIdx }
+  };
+
+  const weatherKeys = Object.keys(WEATHER_CONDITIONS).filter(k => k !== "none");
+  if (Math.random() < 0.30) {
+    const wType = weatherKeys[Math.floor(Math.random() * weatherKeys.length)];
+    setWeather(wType, 3 + Math.floor(Math.random() * 3));
+  } else {
+    setWeather("none", 0);
+  }
+
+  document.getElementById("prep-player-slots").innerHTML = "";
+  document.getElementById("prep-foe-slots").innerHTML = "";
+  battle.player.forEach((m,i) => document.getElementById("prep-player-slots").insertAdjacentHTML("beforeend", `<div class="prep-slot ${i===0?'lead':''}"><div class="n">${i+1}</div><div class="nm">${m.name}</div></div>`));
+  battle.foe.forEach((m,i) => document.getElementById("prep-foe-slots").insertAdjacentHTML("beforeend", `<div class="prep-slot ${i===0?'lead':''} hidden"><div class="n">${i+1}</div><div class="nm">???</div></div>`));
+  document.getElementById("prep-foe-name").textContent = aiOpp.trainer.name;
+
+  document.getElementById("prep-clock").textContent = "00:03";
+  clearInterval(prepTimerHandle);
+  prepTimerHandle = setInterval(() => {
+    const t = parseInt(document.getElementById("prep-clock").textContent.slice(-1));
+    if (t <= 1) { clearInterval(prepTimerHandle); revealFoeAndBattle(); return; }
+    document.getElementById("prep-clock").textContent = "00:0" + (t - 1);
+  }, 1000);
+  document.getElementById("btn-skip-prep").onclick = () => { clearInterval(prepTimerHandle); revealFoeAndBattle(); };
+
+  show("screen-prep");
+}
 
 /* ============================= BATTLE SYSTEM ============================= */
 let battle = null;
@@ -884,12 +1243,51 @@ function resolveTurn(pAct, aiAct){
 
 function forcedSwitchTo(i){ battle.pIndex = i; renderBattle(true); document.getElementById("battle-log").innerHTML = `You send out <b>${activePlayer().name}</b>!`; awaitingInput = true; buildActionPanel(); }
 
+function startPrepWithData(playerUids, oppIds, aiLvl, trainer, oppRank) {
+  const pData = playerUids.map(uid => getMonData(uid));
+
+  battle = {
+    player: pData.map(m => {
+      m.effDef = Math.round(m.def * (m.item === "ironscale" ? 1.15 : 1));
+      m.hp = m.baseHp; m.itemUsed = false; m.fainted = false;
+      m.statusEffects = []; m.statusAtkMult = 1; m.statusSkipTurns = 0;
+      return m;
+    }),
+    foe: oppIds.map(id => instantiateFoe(id, aiLvl)),
+    pIndex: 0, fIndex: 0,
+    opponentName: trainer.name,
+    personality: trainer.personality,
+    over: false
+  };
+
+  const weatherKeys = Object.keys(WEATHER_CONDITIONS).filter(k => k !== "none");
+  if (Math.random() < 0.30) {
+    const wType = weatherKeys[Math.floor(Math.random() * weatherKeys.length)];
+    setWeather(wType, 3 + Math.floor(Math.random() * 3));
+  } else {
+    setWeather("none", 0);
+  }
+
+  document.getElementById("prep-player-slots").innerHTML = "";
+  document.getElementById("prep-foe-slots").innerHTML = "";
+  battle.player.forEach((m,i)=> document.getElementById("prep-player-slots").insertAdjacentHTML("beforeend", `<div class="prep-slot ${i===0?'lead':''}"><div class="n">${i+1}</div><div class="nm">${m.name}</div></div>`));
+  battle.foe.forEach((m,i)=> document.getElementById("prep-foe-slots").insertAdjacentHTML("beforeend", `<div class="prep-slot ${i===0?'lead':''} hidden"><div class="n">${i+1}</div><div class="nm">???</div></div>`));
+  document.getElementById("prep-foe-name").textContent = battle.opponentName + (oppRank ? ` (${oppRank})` : "");
+  show("screen-prep");
+  runPrepTimer();
+}
+
 function endBattle(won){
   battle.over = true;
   if (won) playVictorySound(); else playDefeatSound();
 
   if (battle.survival) {
     handleSurvivalWaveEnd(won);
+    return;
+  }
+
+  if (battle.tournament) {
+    handleTourneyMatchEnd(won);
     return;
   }
 
@@ -936,6 +1334,146 @@ function endBattle(won){
   document.getElementById("end-rank").textContent = `Now ${formatNum(save.vp)} VP — ${rankForVP(save.vp)}`;
 
   setTimeout(()=> show("screen-end"), 600);
+}
+
+function handleTourneyMatchEnd(won) {
+  const matchIdx = battle.tournament.matchIdx;
+  const match = tournamentState.bracket[matchIdx];
+  if (!match) { show("screen-home"); return; }
+
+  const playerIsP1 = match.p1 === "player";
+  if (won) {
+    match.winner = "player";
+    match.loser = playerIsP1 ? match.p2 : match.p1;
+  } else {
+    match.loser = "player";
+    match.winner = playerIsP1 ? match.p2 : match.p1;
+    tournamentState.playerAlive = false;
+  }
+  match.done = true;
+
+  // Give reduced rewards for tournament matches
+  const xpReward = won ? 100 : 30;
+  const goldReward = won ? 40 : 10;
+  save.gold += goldReward;
+  save.playerXp += xpReward;
+
+  battle.player.forEach(m => {
+    let mSave = save.mons.find(x => x.uid === m.uid);
+    if (mSave) {
+      mSave.xp += xpReward;
+      while (mSave.xp >= getMonMaxXp(mSave.level)) { mSave.xp -= getMonMaxXp(mSave.level); mSave.level++; }
+    }
+  });
+
+  // Update bracket for next round
+  updateBracketAfterMatch(matchIdx);
+
+  saveGame();
+  refreshHome();
+
+  if (match.round === "final" || match.round === "third" || !tournamentState.playerAlive) {
+    showTourneyResults();
+  } else {
+    showTourneyBracket();
+  }
+}
+
+function updateBracketAfterMatch(completedIdx) {
+  const match = tournamentState.bracket[completedIdx];
+
+  if (match.round === "semi") {
+    // Determine which final slot this feeds into
+    if (completedIdx === 0) {
+      // Semi 1 winner goes to final p1
+      tournamentState.bracket[2].p1 = match.winner;
+      // Semi 1 loser goes to third place p1
+      tournamentState.bracket[3].p1 = match.loser;
+    } else if (completedIdx === 1) {
+      // Semi 2 winner goes to final p2
+      tournamentState.bracket[2].p2 = match.winner;
+      // Semi 2 loser goes to third place p2
+      tournamentState.bracket[3].p2 = match.loser;
+    }
+  }
+}
+
+function showTourneyResults() {
+  document.getElementById("tourney-title").textContent = "Tournament Complete!";
+
+  // Determine final placement
+  const finalMatch = tournamentState.bracket[2];
+  const thirdMatch = tournamentState.bracket[3];
+
+  // Auto-resolve non-player matches for results display
+  if (finalMatch.winner === null && finalMatch.p1 !== null && finalMatch.p2 !== null) {
+    if (finalMatch.p1 === "player" || finalMatch.p2 === "player") {
+      // Player was in final and lost - already handled
+    } else {
+      // AI vs AI final - auto-resolve
+      finalMatch.winner = finalMatch.p1;
+      finalMatch.loser = finalMatch.p2;
+      finalMatch.done = true;
+    }
+  }
+
+  let placement = 4;
+  let prizeGold = 0;
+  let prizeGems = 0;
+
+  if (!tournamentState.playerAlive) {
+    placement = (finalMatch.loser === "player" || finalMatch.loser === null) ? 2 : 
+                (thirdMatch && (thirdMatch.loser === "player" || thirdMatch.p1 === null)) ? 4 : 3;
+    if (finalMatch && finalMatch.loser === "player") placement = 2;
+    else if (thirdMatch && thirdMatch.winner === "player") placement = 3;
+    else if (thirdMatch && (thirdMatch.p1 === "player" || thirdMatch.p2 === "player") && thirdMatch.loser === "player") placement = 4;
+  } else {
+    placement = 1;
+    // Player won the tournament!
+    if (finalMatch) {
+      if (finalMatch.p1 === "player" || finalMatch.p2 === "player") {
+        finalMatch.winner = "player";
+        finalMatch.loser = (finalMatch.p1 === "player") ? finalMatch.p2 : finalMatch.p1;
+        finalMatch.done = true;
+      }
+    }
+  }
+
+  // Calculate prizes
+  if (placement === 1) { prizeGold = 500; prizeGems = 100; }
+  else if (placement === 2) { prizeGold = 250; prizeGems = 40; }
+  else if (placement === 3) { prizeGold = 125; prizeGems = 20; }
+  else { prizeGold = 50; prizeGems = 5; }
+
+  save.gold += prizeGold;
+  save.gems += prizeGems;
+  saveGame();
+
+  const placementNames = { 1: "1st - Champion! 🏆", 2: "2nd - Runner-Up", 3: "3rd Place", 4: "4th Place" };
+
+  const container = document.getElementById("bracket-view");
+  container.innerHTML = `
+    <div class="tourney-result-banner" style="color:var(--gold);">${placementNames[placement]}</div>
+    <div class="tourney-result-box">
+      <div class="item" style="display:flex; justify-content:space-between; font-family:var(--mono); font-size:14px;">
+        <span>Prize Gold</span><span style="color:var(--gold);">+${formatNum(prizeGold)}</span>
+      </div>
+      <div class="item" style="display:flex; justify-content:space-between; font-family:var(--mono); font-size:14px;">
+        <span>Prize Gems</span><span style="color:var(--gold);">+${formatNum(prizeGems)}</span>
+      </div>
+    </div>
+    <button class="btn gold" onclick="tournamentState=null; refreshHome(); show('screen-home');">Done</button>
+  `;
+
+  show("screen-tournament-bracket");
+}
+
+function updateTourneyDashboard() {
+  const el = document.querySelector("#card-tournament .desc");
+  if (el) {
+    if (tournamentState && tournamentState.playerAlive) el.textContent = "In Progress";
+    else el.textContent = "50 💎 Entry";
+  }
 }
 
 document.getElementById("btn-rematch").addEventListener("click", () => {

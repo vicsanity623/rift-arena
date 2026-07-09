@@ -82,6 +82,11 @@
         <div class="label">Dojo</div>
         <div class="desc" id="dojo-status">Training</div>
       </div>
+      <div class="dash-card" id="card-tournament">
+        <div class="icon-bg">🏆</div>
+        <div class="label">Tournament</div>
+        <div class="desc">50 💎 Entry</div>
+      </div>
       <div class="dash-card" id="card-idle">
         <div class="icon-bg">⏳</div>
         <div class="label">Idle Base</div>
@@ -108,8 +113,9 @@
     <p class="subtitle" style="margin-bottom:10px;">Tap to add in battle order.</p>
     <div class="roster-grid" id="select-grid"></div>
     <div class="footer-bar" style="flex-direction:column; gap:8px;">
-      <button class="btn gold" id="btn-confirm-team" disabled>Confirm Team (0/3)</button>
+      <button class="btn gold" id="btn-confirm-team" disabled>Find Ranked Match (0/3)</button>
       <button class="btn ghost" id="btn-survival-team" disabled style="border-color:var(--gold-dim); color:var(--gold);">Survival Mode (0/3)</button>
+      <button class="btn ghost" id="btn-tournament-team" disabled style="border-color:var(--xp-blue); color:var(--xp-blue);">Tournament (0/3)</button>
     </div>
   </section>
 
@@ -151,6 +157,31 @@
     <div class="backrow"><button class="iconbtn" data-back="screen-home">←</button><h2>Daily Quests</h2></div>
     <p class="subtitle" style="margin-bottom:12px;">Complete quests to earn bonus rewards. Resets daily.</p>
     <div id="quests-content" style="display:flex; flex-direction:column; gap:12px;"></div>
+  </section>
+
+  <!-- MATCHMAKING QUEUE -->
+  <section class="screen" id="screen-queue">
+    <div class="queue-wrap">
+      <div class="queue-spinner"></div>
+      <div class="queue-title">Searching for Opponent</div>
+      <div class="queue-sub" id="queue-sub">Checking the arena...</div>
+      <div class="queue-timer" id="queue-timer">00:00</div>
+      <div class="queue-rank-range" id="queue-rank-range">VP Range: —</div>
+    </div>
+    <div class="footer-bar"><button class="btn ghost" id="btn-cancel-queue">Cancel</button></div>
+  </section>
+
+  <!-- TOURNAMENT BRACKET -->
+  <section class="screen" id="screen-tournament">
+    <div class="backrow"><button class="iconbtn" data-back="screen-home">←</button><h2>Tournament Arena</h2></div>
+    <div id="tournament-content" style="flex:1; display:flex; flex-direction:column; gap:12px;"></div>
+  </section>
+
+  <!-- TOURNAMENT BRACKET VIEW -->
+  <section class="screen" id="screen-tournament-bracket">
+    <div class="backrow"><h2 id="tourney-title">Quarter-Finals</h2></div>
+    <div id="bracket-view" style="flex:1;"></div>
+    <div class="footer-bar"><button class="btn ghost" id="btn-tourney-leave">Leave Tournament</button></div>
   </section>
 
   <!-- PREP -->

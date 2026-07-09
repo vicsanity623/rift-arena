@@ -218,4 +218,38 @@ select.btn.ghost option { background: var(--bg); color: white; }
 .dojo-option-desc{ font-size:11px; color:var(--text-dim); }
 .dojo-option-cost{ font-family:var(--mono); font-size:13px; color:var(--gold); padding:4px 10px; background:rgba(0,0,0,0.3); border-radius:8px; }
 
+/* Matchmaking Queue */
+.queue-wrap{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; text-align:center; }
+.queue-spinner{ width:80px; height:80px; border-radius:50%; border:4px solid var(--line); border-top-color:var(--gold); animation:queueSpin .8s linear infinite; box-shadow:0 0 30px rgba(230,185,77,.15); }
+@keyframes queueSpin{ to{ transform:rotate(360deg); } }
+.queue-title{ font-family:var(--display); font-weight:800; font-size:22px; color:var(--gold); }
+.queue-sub{ font-size:14px; color:var(--text-dim); }
+.queue-timer{ font-family:var(--mono); font-size:32px; color:var(--text); letter-spacing:2px; }
+.queue-rank-range{ font-size:12px; color:var(--gold-dim); }
+
+/* Tournament */
+.tourney-card{ background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:16px; display:flex; flex-direction:column; gap:8px; }
+.tourney-card.highlight{ border-color:var(--gold); box-shadow:0 0 0 1px var(--gold) inset; }
+.tourney-header{ display:flex; justify-content:space-between; align-items:center; }
+.tourney-name{ font-family:var(--display); font-weight:700; font-size:16px; }
+.tourney-prize{ font-family:var(--mono); font-size:13px; color:var(--gold); }
+.tourney-desc{ font-size:12px; color:var(--text-dim); }
+.tourney-status{ font-size:11px; font-family:var(--mono); text-transform:uppercase; letter-spacing:.5px; }
+
+/* Bracket Display */
+.bracket-round-label{ font-family:var(--display); font-weight:800; font-size:15px; color:var(--gold-dim); text-align:center; margin:12px 0 8px; }
+.bracket-match{ background:var(--card); border:1.5px solid var(--line); border-radius:14px; padding:14px; display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
+.bracket-match.live{ border-color:var(--gold); box-shadow:0 0 12px rgba(230,185,77,.15); }
+.bracket-match.completed{ opacity:.7; }
+.bracket-team{ display:flex; justify-content:space-between; align-items:center; padding:6px 8px; border-radius:8px; }
+.bracket-team.winner{ background:var(--gold-soft); color:var(--gold); font-weight:700; }
+.bracket-team.loser{ color:var(--text-dim); text-decoration:line-through; }
+.bracket-team .name{ font-size:13px; }
+.bracket-team .score{ font-family:var(--mono); font-size:12px; }
+.bracket-vs{ text-align:center; font-family:var(--display); font-weight:800; font-size:12px; color:var(--text-dim); }
+
+/* Tournament End Screen */
+.tourney-result-banner{ font-family:var(--display); font-weight:800; font-size:28px; text-align:center; padding:20px 0; }
+.tourney-result-box{ background:var(--card-hi); border:1px solid var(--line); border-radius:12px; padding:20px; display:flex; flex-direction:column; gap:8px; margin:10px 0; }
+
 ::-webkit-scrollbar{ width:6px; } ::-webkit-scrollbar-thumb{ background:var(--line); border-radius:6px; }
