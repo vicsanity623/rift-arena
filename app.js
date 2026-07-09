@@ -16,7 +16,8 @@ const ITEMS = {
   ironscale:    { name:"Iron Scale",    desc:"+15% Defense" },
   guardcharm:   { name:"Guard Charm",   desc:"-10% Dmg taken" },
   vitalberry:   { name:"Vital Berry",   desc:"Heals 25% at low HP" },
-  steadfastsash:{ name:"Steadfast Sash",desc:"Survives lethal hit once" }
+  steadfastsash:{ name:"Steadfast Sash",desc:"Survives lethal hit once" },
+  puredew:      { name:"Pure Dew",      desc:"Cures all status effects when HP<30%" }
 };
 
 const ROSTER_DEF = [
@@ -40,6 +41,93 @@ const TYPE_CHART = {
   stone: { ember:2, volt:2, gale:0.5, verdant:0.5 }, gale: { verdant:2, volt:0.5, stone:0.5 }
 };
 function typeMultiplier(atkType, defType){ return (atkType==="neutral")? 1 : ((TYPE_CHART[atkType] && TYPE_CHART[atkType][defType]) || 1); }
+
+/* ============================= STATUS EFFECTS & WEATHER ============================= */
+const STATUS_EFFECTS = {
+  burn:  { name:"Burn", icon:"🔥", color:"#ff6a45", desc:"-25% ATK, 10% max HP dmg per turn",
+           onApply(m){ m.statusAtkMult = 0.75; },
+           onTick(m){ return Math.floor(m.baseHp * 0.1); },
+           onCure(m){ m.statusAtkMult = 1; } },
+  freeze:{ name:"Freeze", icon:"❄️", color:"#33c7ea", desc:"Cannot move for 1-2 turns",
+           onApply(m){ m.statusSkipTurns = 1 + Math.floor(Math.random() * 2); },
+           onTick(m){ return null; },
+           onCure(m){ m.statusSkipTurns = 0; } },
+  poison:{ name:"Poison", icon:"☠️", color:"#9b59b6", desc:"15% max HP damage per turn",
+           onApply(m){ },
+           onTurn(m){ return Math.floor(m.baseHp * 0.15); },
+           onCure(m){} }
+};
+
+function applyStatus(target, effectKey) {
+  if (target.statusEffects && target.statusEffects.length > 0) return false;
+  if (!target.statusEffects) target.statusEffects = [];
+  const eff = STATUS_EFFECTS[effectKey];
+  if (!eff) return false;
+  target.statusEffects.push(effectKey);
+  target.statusAtkMult = 1;
+  target.statusSkipTurns = 0;
+  if (eff.onApply) eff.onApply(target);
+  return true;
+}
+
+function cureStatus(target) {
+  if (!target.statusEffects || target.statusEffects.length === 0) return;
+  target.statusEffects.forEach(key => {
+    const eff = STATUS_EFFECTS[key];
+    if (eff.onCure) eff.onCure(target);
+  });
+  target.statusEffects = [];
+  target.statusAtkMult = 1;
+  target.statusSkipTurns = 0;
+}
+
+function resolveStatusTick(target) {
+  if (!target.statusEffects || target.statusEffects.length === 0) return null;
+  const key = target.statusEffects[0];
+  const eff = STATUS_EFFECTS[key];
+  if (eff.onTick || eff.onTurn) {
+    let dmg = 0;
+    if (eff.onTick) dmg = eff.onTick(target) || 0;
+    if (eff.onTurn) dmg = eff.onTurn(target) || 0;
+    if (dmg > 0) {
+      target.hp = Math.max(0, target.hp - dmg);
+      return dmg;
+    }
+  }
+  return null;
+}
+
+const WEATHER_CONDITIONS = {
+  sunny:    { name:"Sunny", icon:"☀️", color:"#ff6a45",
+              desc:"Ember +20%, Aqua -20%",
+              modify(atkType, defType){ return atkType==="ember"? 1.2 : atkType==="aqua"? 0.8 : 1; } },
+  rain:     { name:"Rain", icon:"🌧️", color:"#33c7ea",
+              desc:"Aqua +20%, Ember -20%",
+              modify(atkType, defType){ return atkType==="aqua"? 1.2 : atkType==="ember"? 0.8 : 1; } },
+  sandstorm:{ name:"Sandstorm", icon:"🌪️", color:"#c98a52",
+              desc:"Stone +20%, Gale -20%",
+              modify(atkType, defType){ return atkType==="stone"? 1.2 : atkType==="gale"? 0.8 : 1; } },
+  gale:     { name:"Gale Winds", icon:"💨", color:"#9db4ff",
+              desc:"Gale +20%, Verdant -20%",
+              modify(atkType, defType){ return atkType==="gale"? 1.2 : atkType==="verdant"? 0.8 : 1; } },
+  overgrown:{ name:"Overgrown", icon:"🌿", color:"#5fd66b",
+              desc:"Verdant +20%, Volt -20%",
+              modify(atkType, defType){ return atkType==="verdant"? 1.2 : atkType==="volt"? 0.8 : 1; } },
+  none:     { name:"Clear", icon:"☀️", color:"#888",
+              desc:"No weather effects",
+              modify(atkType, defType){ return 1; } }
+};
+
+let weather = { type:"none", turnsLeft:0 };
+function setWeather(type, turns) { weather = { type, turnsLeft: turns }; }
+function advanceWeather() {
+  if (weather.type !== "none") { weather.turnsLeft--; if (weather.turnsLeft <= 0) weather = { type:"none", turnsLeft:0 }; }
+}
+function getWeatherMult(atkType, defType) {
+  if (!weather || weather.type === "none") return 1;
+  const w = WEATHER_CONDITIONS[weather.type];
+  return w ? w.modify(atkType, defType) : 1;
+}
 
 /* ============================= TRAINER TEMPLATES & AI ============================= */
 const TRAINER_TEMPLATES = [
@@ -172,7 +260,7 @@ function generateDefaultSave() {
     lastIdleClaim: Date.now(),
     explore: { active: false },
     dailyQuests: { date: "", quests: [] },
-    bag: { vitalberry: 5, quickfeather: 2, ironscale: 2 },
+    bag: { vitalberry: 5, quickfeather: 2, ironscale: 2, puredew: 1 },
     mons: []
   };
   ["cindrake", "tidenne", "verdil", "sparkit"].forEach((id, i) => {
@@ -421,6 +509,7 @@ function instantiateFoe(baseId, lvl) {
   };
   m.effDef = Math.round(m.def * (m.item === "ironscale" ? 1.15 : 1));
   m.hp = m.baseHp; m.itemUsed = false; m.fainted = false;
+  m.statusEffects = []; m.statusAtkMult = 1; m.statusSkipTurns = 0;
   return m;
 }
 
@@ -460,6 +549,7 @@ function startPrep(playerUids){
     player: pData.map(m => {
       m.effDef = Math.round(m.def * (m.item === "ironscale" ? 1.15 : 1));
       m.hp = m.baseHp; m.itemUsed = false; m.fainted = false;
+      m.statusEffects = []; m.statusAtkMult = 1; m.statusSkipTurns = 0;
       return m;
     }),
     foe: oppIds.map(id => instantiateFoe(id, aiLvl)),
@@ -468,6 +558,15 @@ function startPrep(playerUids){
     personality: trainer.personality,
     over: false
   };
+
+  // Random weather at battle start (30% chance, lasts 3-5 turns)
+  const weatherKeys = Object.keys(WEATHER_CONDITIONS).filter(k => k !== "none");
+  if (Math.random() < 0.30) {
+    const wType = weatherKeys[Math.floor(Math.random() * weatherKeys.length)];
+    setWeather(wType, 3 + Math.floor(Math.random() * 3));
+  } else {
+    setWeather("none", 0);
+  }
 
   document.getElementById("prep-player-slots").innerHTML = ""; document.getElementById("prep-foe-slots").innerHTML = "";
   battle.player.forEach((m,i)=> document.getElementById("prep-player-slots").insertAdjacentHTML("beforeend", `<div class="prep-slot ${i===0?'lead':''}"><div class="n">${i+1}</div><div class="nm">${m.name}</div></div>`));
@@ -498,9 +597,30 @@ function renderBattle(fullRebuild){
   document.getElementById("ally-hp").style.width = Math.max(0,(p.hp/p.baseHp*100)) + "%";
   document.getElementById("foe-hp").style.width = Math.max(0,(f.hp/f.baseHp*100)) + "%";
 
+  // Weather indicator
+  const wEl = document.getElementById("weather-display");
+  if (weather && weather.type !== "none") {
+    const w = WEATHER_CONDITIONS[weather.type];
+    wEl.textContent = `${w.icon} ${w.name} (${weather.turnsLeft}t)`;
+    wEl.style.display = "flex";
+  } else {
+    wEl.style.display = "none";
+  }
+
+  // Status indicators
+  const pStatusEl = document.getElementById("ally-status");
+  const fStatusEl = document.getElementById("foe-status");
+  if (pStatusEl) pStatusEl.innerHTML = (p.statusEffects||[]).map(k => `<span style="color:${STATUS_EFFECTS[k].color}">${STATUS_EFFECTS[k].icon}</span>`).join(" ");
+  if (fStatusEl) fStatusEl.innerHTML = (f.statusEffects||[]).map(k => `<span style="color:${STATUS_EFFECTS[k].color}">${STATUS_EFFECTS[k].icon}</span>`).join(" ");
+
+  // Status CSS on mon sprites
+  const pm = document.getElementById("player-mon"); pm.className = "mon " + p.shape + " t-" + p.type;
+  const fm = document.getElementById("foe-mon"); fm.className = "mon " + f.shape + " t-" + f.type;
+  (p.statusEffects||[]).forEach(k => pm.classList.add(k === "freeze" ? "frozen" : k));
+  (f.statusEffects||[]).forEach(k => fm.classList.add(k === "freeze" ? "frozen" : k));
+
   if(fullRebuild){
     document.getElementById("ally-orb").className = "orb sm t-" + p.type; document.getElementById("foe-orb").className = "orb sm t-" + f.type;
-    document.getElementById("player-mon").className = "mon " + p.shape + " t-" + p.type; document.getElementById("foe-mon").className = "mon " + f.shape + " t-" + f.type;
     buildActionPanel();
   }
 }
@@ -564,15 +684,16 @@ function aiPickAction() {
     }
   }
   
-  // Pick best move considering personality
+  // Pick best move considering personality, weather, and status
   let best = null, bScore = -1;
   f.moves.forEach(mv => {
     const mult = typeMultiplier(mv.type, p.type);
+    const weatherMult = getWeatherMult(mv.type, p.type);
     const accFactor = Math.pow(mv.acc / 100, personality.accWeight);
     const stabBonus = mv.type === f.type ? personality.stabBonus : 1;
     const effPower = mv.power * stabBonus;
     const typeWeight = mult > 1 ? 1.3 : mult < 1 ? 0.7 : 1;
-    const s = effPower * mult * typeWeight * accFactor * personality.dmgWeight;
+    const s = effPower * mult * weatherMult * typeWeight * accFactor * personality.dmgWeight;
     if (s > bScore) { bScore = s; best = mv; }
   });
   return {kind:"move", move: best || f.moves[0]};
@@ -598,14 +719,35 @@ function resolveTurn(pAct, aiAct){
     if(battle.over) return;
     const atk = side==="p"? activePlayer():activeFoe(), def = side==="p"? activeFoe():activePlayer();
     if(atk.fainted || def.fainted) return;
+
+    // Freeze check
+    if (atk.statusSkipTurns > 0) {
+      logLines.push(`${atk.name} is frozen solid and can't move!`);
+      atk.statusSkipTurns--;
+      if (atk.statusSkipTurns <= 0) cureStatus(atk);
+      renderBattle(false);
+      return;
+    }
+
+    // Burn damage before attacking
+    if (atk.statusEffects && atk.statusEffects.includes("burn") && !atk.fainted) {
+      const tick = resolveStatusTick(atk);
+      if (tick && tick !== "skip") {
+        logLines.push(`${atk.name} took ${tick} burn damage.`);
+        if (atk.hp <= 0) { atk.fainted = true; logLines.push(`<b>${atk.name} fainted from burn!</b>`); renderBattle(false); return; }
+      }
+    }
+
     const mv = side==="p"? pAct.move : aiAct.move;
     
     if(mv.type !== "neutral" && Math.random()*100 > mv.acc) { logLines.push(`${atk.name} missed!`); return; }
     const mult = typeMultiplier(mv.type, def.type);
+    const weatherMult = getWeatherMult(mv.type, def.type);
     if(mult === 0) { logLines.push(`${atk.name}'s move had no effect.`); return; }
     
     const isCrit = Math.random() < 0.08;
-    let raw = (atk.atk / def.effDef) * mv.power * 0.5 * mult * (0.85 + Math.random()*0.15);
+    const atkMult = (atk.statusAtkMult || 1);
+    let raw = (atk.atk * atkMult / def.effDef) * mv.power * 0.5 * mult * weatherMult * (0.85 + Math.random()*0.15);
     if (isCrit) raw *= 1.8;
     if(def.item === "guardcharm") raw *= 0.9;
     let dmg = Math.max(1, Math.round(raw));
@@ -622,7 +764,18 @@ function resolveTurn(pAct, aiAct){
     let dmgLog = `${atk.name} used ${mv.name} for ${dmg} damage.`;
     if (isCrit) dmgLog += " <b style='color:var(--danger);'>Critical hit!</b>";
     if(mult>1) dmgLog += " <b style='color:var(--gold)'>Super effective!</b>";
+    if(weatherMult !== 1) dmgLog += weatherMult > 1 ? " <span style='color:var(--warn)'>Weather boosted!</span>" : " <span style='color:var(--text-dim)'>Weather dampened...</span>";
     logLines.push(dmgLog);
+
+    // 20% chance to apply status effect based on move type
+    if (!def.statusEffects || def.statusEffects.length === 0) {
+      const statusChance = { ember:0.2, aqua:0.2, verdant:0, volt:0.2, stone:0, gale:0 };
+      const statusMap = { ember:"burn", aqua:"freeze", volt:"burn", gale:"freeze" };
+      if (statusChance[mv.type] && Math.random() < statusChance[mv.type]) {
+        const applied = applyStatus(def, statusMap[mv.type]);
+        if (applied) logLines.push(`<b>${def.name} was ${STATUS_EFFECTS[statusMap[mv.type]].icon} ${STATUS_EFFECTS[statusMap[mv.type]].name}ed!</b>`);
+      }
+    }
     
     const defEl = document.getElementById(side==="p"?"foe-mon":"player-mon");
     defEl.classList.remove("hit"); void defEl.offsetWidth; defEl.classList.add(isCrit ? "crit-hit" : "hit");
@@ -648,6 +801,21 @@ function resolveTurn(pAct, aiAct){
       playHealSound();
       logLines.push(`<b>${def.name} consumed its Vital Berry and healed ${heal} HP!</b>`);
     }
+    if(!def.fainted && def.hp > 0 && def.statusEffects && def.statusEffects.length > 0 && def.hp / def.baseHp <= 0.30 && def.item === "puredew" && !def.itemUsed) {
+      def.itemUsed = true;
+      const cured = [...def.statusEffects];
+      cureStatus(def);
+      logLines.push(`<b>${def.name} consumed Pure Dew and cured ${cured.map(k=>STATUS_EFFECTS[k].icon).join("")}!</b>`);
+    }
+
+    // Poison tick on defender after hit
+    if (!def.fainted && def.hp > 0 && def.statusEffects && def.statusEffects.includes("poison")) {
+      const tick = resolveStatusTick(def);
+      if (tick && tick !== "skip") {
+        logLines.push(`${def.name} took ${tick} poison damage.`);
+        if (def.hp <= 0) { def.fainted = true; logLines.push(`<b>${def.name} fainted from poison!</b>`); }
+      }
+    }
 
     if(def.hp <= 0){
       def.fainted = true; logLines.push(`<b>${def.name} fainted!</b>`);
@@ -659,7 +827,13 @@ function resolveTurn(pAct, aiAct){
   order.forEach(doMove);
   renderBattle(false);
   document.getElementById("battle-log").innerHTML = logLines.join("<br>");
-  
+
+  advanceWeather();
+  if (weather.type !== "none") {
+    const w = WEATHER_CONDITIONS[weather.type];
+    logLines.push(`<span style="color:${w.color}">${w.icon} ${w.name} (${weather.turnsLeft}t)</span>`);
+  }
+
   setTimeout(()=>{
     if(battle.player.every(m=>m.fainted)) return endBattle(false);
     if(battle.foe.every(m=>m.fainted)) return endBattle(true);
