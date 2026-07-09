@@ -259,6 +259,7 @@ function generateDefaultSave() {
     tierLevel: 1, tierXp: 0,
     lastIdleClaim: Date.now(),
     explore: { active: false },
+    dojo: { active: false },
     dailyQuests: { date: "", quests: [] },
     bag: { vitalberry: 5, quickfeather: 2, ironscale: 2, puredew: 1 },
     mons: []
@@ -334,6 +335,7 @@ function refreshHome(){
   document.getElementById("home-rank").textContent = rankForVP(save.vp);
   document.getElementById("home-vp").textContent = formatNum(save.vp) + " VP";
   updateExploreDash();
+  updateDojoDash();
 }
 
 setInterval(() => {
@@ -371,6 +373,7 @@ document.getElementById("card-summon").addEventListener("click", () => {
 document.getElementById("card-explore").addEventListener("click", ()=>{ initExploreUI(); show("screen-explore"); });
 document.getElementById("card-merge").addEventListener("click", ()=>{ initMergeUI(); show("screen-merge"); });
 document.getElementById("card-bag").addEventListener("click", ()=>{ initBagUI(); show("screen-bag"); });
+document.getElementById("card-dojo").addEventListener("click", ()=>{ initDojoUI(); show("screen-dojo"); });
 
 document.getElementById("card-battle").addEventListener("click", ()=>{ buildSelectGrid(); show("screen-select"); });
 document.getElementById("card-roster").addEventListener("click", ()=>{ buildRosterView(); show("screen-roster"); });
@@ -486,11 +489,19 @@ function updateConfirmBtn(){
   const btn = document.getElementById("btn-confirm-team");
   btn.textContent = `Confirm Team (${pickOrder.length}/3)`;
   btn.disabled = pickOrder.length !== 3;
+  const survBtn = document.getElementById("btn-survival-team");
+  survBtn.textContent = `Survival Mode (${pickOrder.length}/3)`;
+  survBtn.disabled = pickOrder.length !== 3;
 }
 
 document.getElementById("btn-confirm-team").addEventListener("click", ()=>{
   if(pickOrder.length !== 3) return;
   startPrep(pickOrder.slice());
+});
+
+document.getElementById("btn-survival-team").addEventListener("click", ()=>{
+  if(pickOrder.length !== 3) return;
+  startSurvivalMode();
 });
 
 /* ============================= BATTLE SYSTEM ============================= */
@@ -847,6 +858,12 @@ function forcedSwitchTo(i){ battle.pIndex = i; renderBattle(true); document.getE
 function endBattle(won){
   battle.over = true;
   if (won) playVictorySound(); else playDefeatSound();
+
+  if (battle.survival) {
+    handleSurvivalWaveEnd(won);
+    return;
+  }
+
   document.getElementById("end-banner").textContent = won ? "VICTORY" : "DEFEAT";
   document.getElementById("end-banner").className = "end-banner " + (won ? "win":"lose");
 

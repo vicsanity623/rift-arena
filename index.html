@@ -72,6 +72,11 @@
         <div class="label">Bag</div>
         <div class="desc">Items</div>
       </div>
+      <div class="dash-card" id="card-dojo">
+        <div class="icon-bg">🥋</div>
+        <div class="label">Dojo</div>
+        <div class="desc" id="dojo-status">Training</div>
+      </div>
       <div class="dash-card" id="card-idle">
         <div class="icon-bg">⏳</div>
         <div class="label">Idle Base</div>
@@ -97,8 +102,9 @@
     <div class="backrow"><button class="iconbtn" data-back="screen-home">←</button><h2>Choose Your Three</h2></div>
     <p class="subtitle" style="margin-bottom:10px;">Tap to add in battle order.</p>
     <div class="roster-grid" id="select-grid"></div>
-    <div class="footer-bar">
+    <div class="footer-bar" style="flex-direction:column; gap:8px;">
       <button class="btn gold" id="btn-confirm-team" disabled>Confirm Team (0/3)</button>
+      <button class="btn ghost" id="btn-survival-team" disabled style="border-color:var(--gold-dim); color:var(--gold);">Survival Mode (0/3)</button>
     </div>
   </section>
 
@@ -120,6 +126,12 @@
     <div class="backrow"><button class="iconbtn" data-back="screen-home">←</button><h2>Inventory Bag</h2></div>
     <p class="subtitle" style="margin-bottom:10px;">Tap an item to equip it to a Rift-form.</p>
     <div id="bag-content" style="display:flex; flex-direction:column; gap:12px;"></div>
+  </section>
+
+  <!-- TRAINING DOJO -->
+  <section class="screen" id="screen-dojo">
+    <div class="backrow"><button class="iconbtn" data-back="screen-home">←</button><h2>Training Dojo</h2></div>
+    <div id="dojo-content" style="flex:1; display:flex; flex-direction:column; gap:16px;"></div>
   </section>
 
   <!-- DAILY QUESTS -->

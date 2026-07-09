@@ -119,6 +119,328 @@ function claimQuestReward(index) {
   alert(`Quest complete!\n\nRewards:\n🪙 ${formatNum(q.reward.gold)} Gold\n💎 ${formatNum(q.reward.gems)} Gems`);
 }
 
+// --- TRAINING DOJO SYSTEM ---
+const DOJO_TRAININGS = {
+  light:   { name:"Light Sparring",   durMs: 60000,   xpMult:1,   goldCost:0,   desc:"1 min · Low XP" },
+  medium:  { name:"Medium Training",  durMs: 180000,  xpMult:3,   goldCost:50,  desc:"3 min · Medium XP" },
+  intense: { name:"Intense Regimen",  durMs: 300000,  xpMult:6,   goldCost:150, desc:"5 min · High XP" }
+};
+
+function initDojoUI() {
+  const container = document.getElementById("dojo-content");
+  container.innerHTML = "";
+
+  if (save.dojo && save.dojo.active) {
+    const timeLeft = Math.max(0, save.dojo.endTime - Date.now());
+    const mins = Math.ceil(timeLeft / 60000);
+    const secs = Math.ceil((timeLeft % 60000) / 1000);
+    const m = getMonData(save.dojo.uid);
+    const training = DOJO_TRAININGS[save.dojo.type];
+
+    if (timeLeft <= 0) {
+      container.innerHTML = `
+        <div class="details-card" style="text-align:center;">
+          <h3>Training Complete!</h3>
+          <p>${m.name} has finished ${training.name}.</p>
+          <button class="btn gold" id="btn-claim-dojo">Claim Rewards</button>
+        </div>
+      `;
+      document.getElementById("btn-claim-dojo").onclick = claimDojo;
+    } else {
+      container.innerHTML = `
+        <div class="details-card" style="text-align:center;">
+          <h3>Training in Progress</h3>
+          <div class="orb mon-big-orb t-${m.type}" style="margin:20px auto;"><div class="glyph"></div></div>
+          <p>${m.name} is training (${training.name})...</p>
+          <p style="font-family:var(--mono); color:var(--warn); font-size:24px;">${mins}:${String(secs).padStart(2,"0")} remaining</p>
+        </div>
+      `;
+    }
+  } else {
+    const eligibleMons = save.mons.filter(m => !m.onExpedition);
+    if (eligibleMons.length === 0) {
+      container.innerHTML = `<p>No Rift-forms available to train.</p>`;
+      return;
+    }
+
+    let selectHtml = `<select id="dojo-mon-select" class="btn ghost" style="border:1px solid var(--line); color:white; padding:10px;">`;
+    eligibleMons.forEach(m => {
+      const data = getMonData(m.uid);
+      selectHtml += `<option value="${m.uid}">${data.name} (Lv.${data.level})</option>`;
+    });
+    selectHtml += `</select>`;
+
+    let trainingHtml = `<div class="dojo-options">`;
+    Object.keys(DOJO_TRAININGS).forEach(key => {
+      const t = DOJO_TRAININGS[key];
+      trainingHtml += `
+        <label class="dojo-option" data-key="${key}">
+          <input type="radio" name="dojo-type" value="${key}" ${key === "light" ? "checked" : ""}>
+          <div class="dojo-option-content">
+            <div class="dojo-option-name">${t.name}</div>
+            <div class="dojo-option-desc">${t.desc}</div>
+            <div class="dojo-option-cost">${t.goldCost > 0 ? `🪙 ${t.goldCost}` : "Free"}</div>
+          </div>
+        </label>
+      `;
+    });
+    trainingHtml += `</div>`;
+
+    container.innerHTML = `
+      <div class="details-card">
+        <h3>Training Dojo</h3>
+        <p class="subtitle">Send a Rift-form to train and earn XP.</p>
+        <label style="font-size:12px; color:var(--text-dim);">Select Rift-form:</label>
+        ${selectHtml}
+        <label style="font-size:12px; color:var(--text-dim); margin-top:10px;">Select Training:</label>
+        ${trainingHtml}
+        <button class="btn gold" id="btn-start-dojo" style="margin-top:20px;">Start Training</button>
+      </div>
+    `;
+
+    document.getElementById("btn-start-dojo").onclick = () => {
+      const uid = document.getElementById("dojo-mon-select").value;
+      const typeEl = document.querySelector('input[name="dojo-type"]:checked');
+      if (!typeEl) return alert("Select a training type.");
+      const type = typeEl.value;
+      const training = DOJO_TRAININGS[type];
+
+      if (save.gold < training.goldCost) return alert(`Not enough gold. Need ${training.goldCost} 🪙.`);
+
+      save.gold -= training.goldCost;
+      const monState = save.mons.find(m => m.uid === uid);
+      monState.onExpedition = true; // reuse expedition flag to block battle
+
+      save.dojo = {
+        active: true,
+        uid: uid,
+        type: type,
+        endTime: Date.now() + training.durMs
+      };
+      saveGame();
+      initDojoUI();
+    };
+  }
+}
+
+function claimDojo() {
+  const mSave = save.mons.find(m => m.uid === save.dojo.uid);
+  const training = DOJO_TRAININGS[save.dojo.type];
+
+  const xpGained = training.xpMult * 75;
+  const goldGained = training.xpMult * 5;
+
+  mSave.xp += xpGained;
+  mSave.onExpedition = false;
+
+  while (mSave.xp >= getMonMaxXp(mSave.level)) {
+    mSave.xp -= getMonMaxXp(mSave.level);
+    mSave.level++;
+  }
+
+  save.dojo = { active: false };
+  saveGame();
+
+  alert(`Training complete!\n\n${mSave.baseId} gained ${xpGained} XP\n${formatNum(goldGained)} Gold earned`);
+  refreshHome();
+  show("screen-home");
+}
+
+// --- SURVIVAL MODE ---
+let survivalState = null;
+
+function startSurvivalMode() {
+  const pData = pickOrder.map(uid => getMonData(uid));
+  if (pData.length !== 3) return alert("Select 3 Rift-forms first.");
+
+  const avgLevel = Math.max(1, Math.floor(pData.reduce((s, m) => s + m.level, 0) / 3));
+
+  survivalState = {
+    wave: 1,
+    player: pData.map(m => {
+      m.effDef = Math.round(m.def * (m.item === "ironscale" ? 1.15 : 1));
+      m.hp = m.baseHp; m.itemUsed = false; m.fainted = false;
+      m.statusEffects = []; m.statusAtkMult = 1; m.statusSkipTurns = 0;
+      return m;
+    }),
+    pIndex: 0,
+    rewards: { gold: 0, gems: 0, xp: 0, vp: 0 },
+    over: false
+  };
+
+  generateSurvivalWave();
+}
+
+function generateSurvivalWave() {
+  const wave = survivalState.wave;
+  const baseLvl = Math.max(1, Math.floor(
+    survivalState.player.reduce((s, m) => s + m.level, 0) / 3
+  ) + wave - 1);
+
+  const trainer = TRAINER_TEMPLATES[Math.floor(Math.random() * TRAINER_TEMPLATES.length)];
+  let oppIds;
+  if (trainer.theme) {
+    const themes = trainer.theme.includes("+") ? trainer.theme.split("+") : [trainer.theme];
+    let pool = [];
+    themes.forEach(t => {
+      if (THEMED_ROSTER[t]) pool = pool.concat(THEMED_ROSTER[t]);
+    });
+    pool = [...new Set(pool)].sort(() => Math.random() - 0.5);
+    const fromTheme = [...pool];
+    while (fromTheme.length < 3) {
+      const extra = ROSTER_DEF.map(r=>r[0]).sort(()=>Math.random()-0.5).filter(id => !fromTheme.includes(id));
+      fromTheme.push(extra[0]);
+    }
+    oppIds = fromTheme;
+  } else {
+    oppIds = ROSTER_DEF.map(r=>r[0]).sort(()=>Math.random()-0.5).slice(0, 3);
+  }
+
+  // Refill alive player mons, keep dead ones dead
+  survivalState.player.forEach(m => {
+    if (!m.fainted) {
+      m.hp = m.baseHp;
+      m.statusEffects = [];
+      m.statusAtkMult = 1;
+      m.statusSkipTurns = 0;
+      m.itemUsed = false;
+    }
+  });
+  survivalState.pIndex = survivalState.player.findIndex(m => !m.fainted);
+  if (survivalState.pIndex === -1) survivalState.pIndex = 0;
+
+  battle = {
+    player: survivalState.player,
+    foe: oppIds.map(id => instantiateFoe(id, baseLvl)),
+    pIndex: survivalState.pIndex,
+    fIndex: 0,
+    opponentName: trainer.name + ` (Wave ${survivalState.wave})`,
+    personality: trainer.personality,
+    over: false,
+    survival: true
+  };
+
+  const weatherKeys = Object.keys(WEATHER_CONDITIONS).filter(k => k !== "none");
+  if (Math.random() < 0.30) {
+    const wType = weatherKeys[Math.floor(Math.random() * weatherKeys.length)];
+    setWeather(wType, 3 + Math.floor(Math.random() * 3));
+  } else {
+    setWeather("none", 0);
+  }
+
+  show("screen-battle");
+  document.getElementById("battle-log").textContent = `Survival — Wave ${survivalState.wave} against ${trainer.name}!`;
+  renderBattle(true);
+}
+
+function handleSurvivalWaveEnd(won) {
+  if (won) {
+    survivalState.wave++;
+    const waveRewards = {
+      gold: 50 + survivalState.wave * 25,
+      gems: 5 + survivalState.wave * 2,
+      xp: 100 + survivalState.wave * 50,
+      vp: 10 + survivalState.wave * 5
+    };
+    survivalState.rewards.gold += waveRewards.gold;
+    survivalState.rewards.gems += waveRewards.gems;
+    survivalState.rewards.xp += waveRewards.xp;
+    survivalState.rewards.vp += waveRewards.vp;
+
+    // Grant survival rewards
+    save.gold += waveRewards.gold;
+    save.gems += waveRewards.gems;
+    save.playerXp += waveRewards.xp;
+
+    while (save.playerXp >= getPlayerMaxXp(save.playerLevel)) {
+      save.playerXp -= getPlayerMaxXp(save.playerLevel);
+      save.playerLevel++;
+      save.gems += 50;
+    }
+
+    battle.player.forEach(m => {
+      let mSave = save.mons.find(x => x.uid === m.uid);
+      if (mSave) {
+        mSave.xp += waveRewards.xp;
+        while (mSave.xp >= getMonMaxXp(mSave.level)) { mSave.xp -= getMonMaxXp(mSave.level); mSave.level++; }
+      }
+    });
+
+    saveGame();
+
+    // Check if any player mons died
+    if (battle.player.every(m => m.fainted)) {
+      survivalLost();
+      return;
+    }
+
+    // Show wave victory screen with Continue / Retreat
+    showSurvivalWaveEndUI(waveRewards);
+  } else {
+    survivalLost();
+  }
+}
+
+function showSurvivalWaveEndUI(waveRewards) {
+  const container = document.getElementById("app");
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+
+  const survivalEl = document.createElement("section");
+  survivalEl.className = "screen active";
+  survivalEl.id = "screen-survival-end";
+  survivalEl.innerHTML = `
+    <div class="end-wrap" style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:10px;">
+      <div class="end-banner win" style="font-size:28px;">Wave ${survivalState.wave - 1} Cleared!</div>
+      <div class="rewards-box" style="background:var(--card-hi); border:1px solid var(--line); border-radius:12px; padding:16px; min-width:200px; display:flex; flex-direction:column; gap:6px;">
+        <div class="item"><span>Wave Gold</span><span>+${formatNum(waveRewards.gold)}</span></div>
+        <div class="item"><span>Wave Gems</span><span>+${formatNum(waveRewards.gems)}</span></div>
+        <div class="item"><span>Wave XP</span><span>+${formatNum(waveRewards.xp)}</span></div>
+        <div class="item" style="border-top:1px solid var(--line); padding-top:6px; margin-top:4px; color:var(--gold);">
+          <span>Total Rewards</span><span>🪙${formatNum(survivalState.rewards.gold)} 💎${formatNum(survivalState.rewards.gems)}</span>
+        </div>
+      </div>
+      <p style="font-size:13px; color:var(--text-dim);">Next wave: +${survivalState.wave * 5}% difficulty</p>
+      <div style="display:flex; gap:10px; width:100%; max-width:300px;">
+        <button class="btn gold" id="btn-survival-continue">Continue (Wave ${survivalState.wave})</button>
+        <button class="btn ghost" id="btn-survival-retreat">Retreat</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById("app").appendChild(survivalEl);
+
+  document.getElementById("btn-survival-continue").onclick = () => {
+    survivalEl.remove();
+    generateSurvivalWave();
+  };
+
+  document.getElementById("btn-survival-retreat").onclick = () => {
+    survivalEl.remove();
+    survivalComplete();
+  };
+}
+
+function survivalLost() {
+  survivalState.over = true;
+  const survived = survivalState.wave - 1;
+  alert(`Defeated at Wave ${survivalState.wave}!\n\nYou earned ${formatNum(survivalState.rewards.gold)} Gold, ${formatNum(survivalState.rewards.gems)} Gems over ${survived} waves.`);
+  survivalState = null;
+  pickOrder = [];
+  refreshHome();
+  show("screen-home");
+}
+
+function survivalComplete() {
+  const waves = survivalState.wave - 1;
+  const msg = `Survival complete! Cleared ${waves} waves.\n\nFinal Rewards: 🪙${formatNum(survivalState.rewards.gold)} 💎${formatNum(survivalState.rewards.gems)}`;
+  alert(msg);
+  playVictorySound();
+  survivalState = null;
+  pickOrder = [];
+  refreshHome();
+  show("screen-home");
+}
+
 // --- NUMBER FORMATTING ---
 function formatNum(num) {
   if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
@@ -265,6 +587,23 @@ function updateExploreDash() {
 }
 
 setInterval(updateExploreDash, 5000);
+
+// --- DOJO STATUS ON DASHBOARD ---
+function updateDojoDash() {
+  if (save.dojo && save.dojo.active) {
+    const timeLeft = save.dojo.endTime - Date.now();
+    if (timeLeft <= 0) document.getElementById("dojo-status").textContent = "Complete!";
+    else {
+      const mins = Math.floor(timeLeft / 60000);
+      const secs = Math.floor((timeLeft % 60000) / 1000);
+      document.getElementById("dojo-status").textContent = mins + ":" + String(secs).padStart(2,"0") + " left";
+    }
+  } else {
+    document.getElementById("dojo-status").textContent = "Training";
+  }
+}
+
+setInterval(updateDojoDash, 5000);
 
 // --- MERGE SYSTEM ---
 function initMergeUI() {
