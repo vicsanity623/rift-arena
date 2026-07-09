@@ -378,6 +378,7 @@ function rankForVP(vp) {
 function initLeaderboardUI() {
   const fmt = typeof window.formatNum === "function" ? window.formatNum : (n => n);
   const container = document.getElementById("leaderboard-content");
+  if (!container) return;
   container.innerHTML = "";
 
   const sorted = [...NPC_LEADERBOARD].sort((a, b) => b.vp - a.vp);
@@ -445,8 +446,13 @@ function initLeaderboardUI() {
 
 /* ============================= UI NAVIGATION ============================= */
 function show(id) {
+  const target = document.getElementById(id);
+  if (!target) {
+    console.warn(`Navigation Warning: Screen with ID "${id}" was not found in the DOM.`);
+    return;
+  }
   document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
-  document.getElementById(id).classList.add("active");
+  target.classList.add("active");
 }
 document.querySelectorAll("[data-back]").forEach(btn => {
   btn.addEventListener("click", () => {
@@ -538,8 +544,10 @@ document.getElementById("card-battle").addEventListener("contextmenu", (e) => {
 });
 document.getElementById("card-roster").addEventListener("click", () => { buildRosterView(); show("screen-roster"); });
 if (document.getElementById("card-quests")) document.getElementById("card-quests").addEventListener("click", () => { initQuestsUI(); show("screen-quests"); });
+
 function showTournamentInfo() {
   const container = document.getElementById("tournament-content");
+  if (!container) return;
   const gemsHave = save.gems;
   container.innerHTML = `
     <div class="tourney-card highlight">
@@ -553,7 +561,7 @@ function showTournamentInfo() {
         Prizes: 1st: 500🪙+100💎 · 2nd: 250🪙+40💎 · 3rd: 125🪙+20💎 · 4th: 50🪙+5💎
       </div>
       <button class="btn gold" id="btn-enter-tourney" style="margin-top:8px;" ${gemsHave < 50 ? 'disabled' : ''}>${gemsHave < 50 ? 'Not enough Gems' : 'Select Team →'}</button>
-      <button class="btn ghost" data-back="screen-home" style="margin-top:4px;">Back</button>
+      <button class="btn ghost" onclick="refreshHome(); show('screen-home');" style="margin-top:4px;">Back</button>
     </div>
   `;
   document.getElementById("btn-enter-tourney").onclick = () => {
@@ -573,7 +581,7 @@ if (document.getElementById("card-tournament")) {
       showTourneyBracket();
     } else {
       showTournamentInfo();
-      show("screen-tournament-info");
+      show("screen-tournament");
     }
   });
 }
@@ -596,6 +604,7 @@ function statLine(m) { return `HP ${m.baseHp} · ATK ${m.atk} · DEF ${m.def} ·
 
 function buildRosterView() {
   const grid = document.getElementById("roster-view-grid");
+  if (!grid) return;
   grid.innerHTML = "";
 
   save.mons.forEach(mSave => {
@@ -620,6 +629,7 @@ function buildRosterView() {
 
 function showMonDetails(m) {
   const view = document.getElementById("mon-details-view");
+  if (!view) return;
   const upgCost = m.level * 100;
 
   const drawStat = (label, val, max) => `
@@ -682,6 +692,7 @@ function buildSelectGrid() {
   battleMode = "ranked";
   pickOrder = [];
   const grid = document.getElementById("select-grid");
+  if (!grid) return;
   grid.innerHTML = "";
 
   const survBtn = document.getElementById("btn-survival-team");
@@ -722,6 +733,7 @@ function togglePick(uid, card) {
 
 function updateConfirmBtn() {
   const btn = document.getElementById("btn-confirm-team");
+  if (!btn) return;
   btn.textContent = `Find Ranked Match (${pickOrder.length}/3)`;
   btn.disabled = pickOrder.length !== 3;
   const survBtn = document.getElementById("btn-survival-team");
@@ -925,6 +937,7 @@ function startTournamentMode(playerUids) {
 
 function showTourneyBracket() {
   const container = document.getElementById("bracket-view");
+  if (!container) return;
   container.innerHTML = "";
 
   const roundLabel = tournamentState.bracket.every(m => m.done) ? "Tournament Results" :
@@ -1105,7 +1118,8 @@ function renderBattle(fullRebuild) {
   if (!wEl) {
     wEl = document.createElement("div"); wEl.id = "weather-display";
     wEl.style = "position:absolute; top:10px; right:10px; background:rgba(0,0,0,0.5); padding:4px 8px; border-radius:8px; font-size:12px; z-index:10;";
-    document.getElementById("arena").appendChild(wEl);
+    const arena = document.getElementById("arena");
+    if (arena) arena.appendChild(wEl);
   }
 
   if (weather && weather.type !== "none") {
@@ -1320,16 +1334,18 @@ async function resolveTurn(pAct, aiAct) {
     defEl.classList.remove("hit"); void defEl.offsetWidth; defEl.classList.add(isCrit ? "crit-hit" : "hit");
 
     const arena = document.getElementById("arena");
-    arena.classList.remove("shake"); void arena.offsetWidth; arena.classList.add("shake");
+    if (arena) {
+      arena.classList.remove("shake"); void arena.offsetWidth; arena.classList.add("shake");
 
-    const dmgFloat = document.createElement("div");
-    dmgFloat.className = "dmg-float" + (isCrit ? " crit" : "");
-    dmgFloat.textContent = dmg;
-    const defRect = defEl.getBoundingClientRect(), arenaRect = arena.getBoundingClientRect();
-    dmgFloat.style.left = (defRect.left - arenaRect.left + defRect.width / 2 - 20) + "px";
-    dmgFloat.style.top = (defRect.top - arenaRect.top + 10) + "px";
-    arena.appendChild(dmgFloat);
-    setTimeout(() => dmgFloat.remove(), 1000);
+      const dmgFloat = document.createElement("div");
+      dmgFloat.className = "dmg-float" + (isCrit ? " crit" : "");
+      dmgFloat.textContent = dmg;
+      const defRect = defEl.getBoundingClientRect(), arenaRect = arena.getBoundingClientRect();
+      dmgFloat.style.left = (defRect.left - arenaRect.left + defRect.width / 2 - 20) + "px";
+      dmgFloat.style.top = (defRect.top - arenaRect.top + 10) + "px";
+      arena.appendChild(dmgFloat);
+      setTimeout(() => dmgFloat.remove(), 1000);
+    }
 
     if (!def.fainted && def.hp > 0 && def.hp / def.baseHp <= 0.25 && def.item === "vitalberry" && !def.itemUsed) {
       def.itemUsed = true;
@@ -1609,18 +1625,20 @@ function showTourneyResults() {
   const placementNames = { 1: "1st - Champion! 🏆", 2: "2nd - Runner-Up", 3: "3rd Place", 4: "4th Place" };
 
   const container = document.getElementById("bracket-view");
-  container.innerHTML = `
-    <div class="tourney-result-banner" style="color:var(--gold);">${placementNames[placement]}</div>
-    <div class="tourney-result-box">
-      <div class="item" style="display:flex; justify-content:space-between; font-family:var(--mono); font-size:14px;">
-        <span>Prize Gold</span><span style="color:var(--gold);">+${formatNum(prizeGold)}</span>
+  if (container) {
+    container.innerHTML = `
+      <div class="tourney-result-banner" style="color:var(--gold);">${placementNames[placement]}</div>
+      <div class="tourney-result-box">
+        <div class="item" style="display:flex; justify-content:space-between; font-family:var(--mono); font-size:14px;">
+          <span>Prize Gold</span><span style="color:var(--gold);">+${formatNum(prizeGold)}</span>
+        </div>
+        <div class="item" style="display:flex; justify-content:space-between; font-family:var(--mono); font-size:14px;">
+          <span>Prize Gems</span><span style="color:var(--gold);">+${formatNum(prizeGems)}</span>
+        </div>
       </div>
-      <div class="item" style="display:flex; justify-content:space-between; font-family:var(--mono); font-size:14px;">
-        <span>Prize Gems</span><span style="color:var(--gold);">+${formatNum(prizeGems)}</span>
-      </div>
-    </div>
-    <button class="btn gold" onclick="tournamentState=null; refreshHome(); show('screen-home');">Done</button>
-  `;
+      <button class="btn gold" onclick="tournamentState=null; refreshHome(); show('screen-home');">Done</button>
+    `;
+  }
 
   show("screen-tournament-bracket");
 }
