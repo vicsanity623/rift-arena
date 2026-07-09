@@ -43,20 +43,28 @@ function typeMultiplier(atkType, defType){ return (atkType==="neutral")? 1 : ((T
 
 /* ============================= TRAINER TEMPLATES & AI ============================= */
 const TRAINER_TEMPLATES = [
-  { name:"Epidemic",  theme:null, personality:"balanced",  desc:"Balanced challenger" },
-  { name:"Nightshard",theme:"ember", personality:"aggressive",desc:"Fire specialist" },
-  { name:"Vellum",    theme:"aqua", personality:"defensive", desc:"Water tactician" },
-  { name:"Kestrix",   theme:"gale", personality:"aggressive",desc:"Wind striker" },
-  { name:"Rowan",     theme:"verdant",personality:"balanced",desc:"Nature guardian" },
-  { name:"Ashvale",   theme:"stone", personality:"defensive",desc:"Rock bulwark" },
-  { name:"Voltara",   theme:"volt", personality:"balanced", desc:"Thunder master" },
-  { name:"Diremire",  theme:null, personality:"aggressive",desc:"Wildcard brawler" }
+  { name:"Epidemic",   theme:null,             personality:"balanced",   desc:"Balanced challenger" },
+  { name:"Nightshard", theme:"ember",           personality:"aggressive", desc:"Fire specialist" },
+  { name:"Vellum",     theme:"aqua",            personality:"defensive",  desc:"Water tactician" },
+  { name:"Kestrix",    theme:"gale",            personality:"aggressive", desc:"Wind striker" },
+  { name:"Rowan",      theme:"verdant",         personality:"balanced",   desc:"Nature guardian" },
+  { name:"Ashvale",    theme:"stone",           personality:"defensive",  desc:"Rock bulwark" },
+  { name:"Voltara",    theme:"volt",            personality:"balanced",   desc:"Thunder master" },
+  { name:"Diremire",   theme:null,              personality:"aggressive", desc:"Wildcard brawler" },
+  { name:"Glacius",    theme:"aqua+gale",       personality:"defensive",  desc:"Permafrost duelist" },
+  { name:"Sylvara",    theme:"verdant+ember",   personality:"balanced",   desc:"Overgrowth shaman" },
+  { name:"Tecton",     theme:"stone+volt",      personality:"aggressive", desc:"Magma titan" },
+  { name:"Shadoom",    theme:null,              personality:"tactician",  desc:"Calculated predator" },
+  { name:"Blitzara",   theme:"volt+gale",       personality:"reckless",   desc:"Storm chaser" },
+  { name:"Fernwood",   theme:"verdant+stone",   personality:"defensive",  desc:"Ancient warden" },
 ];
 
 const AI_PERSONALITIES = {
-  aggressive: { switchChance:0.1, dmgWeight:1.2, switchBelowHpPct:0.15 },
-  balanced:   { switchChance:0.3, dmgWeight:1.0, switchBelowHpPct:0.2 },
-  defensive:  { switchChance:0.5, dmgWeight:0.8, switchBelowHpPct:0.35 }
+  aggressive: { switchChance:0.08, dmgWeight:1.3,  switchBelowHpPct:0.12, accWeight:0.6,  stabBonus:1.1 },
+  balanced:   { switchChance:0.3,  dmgWeight:1.0,  switchBelowHpPct:0.25, accWeight:1.0,  stabBonus:1.1 },
+  defensive:  { switchChance:0.55, dmgWeight:0.85, switchBelowHpPct:0.4,  accWeight:1.2,  stabBonus:1.15 },
+  tactician:  { switchChance:0.4,  dmgWeight:1.0,  switchBelowHpPct:0.3,  accWeight:1.1,  stabBonus:1.2 },
+  reckless:   { switchChance:0.05, dmgWeight:1.5,  switchBelowHpPct:0.08, accWeight:0.4,  stabBonus:0.9 }
 };
 
 const THEMED_ROSTER = {
@@ -427,11 +435,17 @@ function startPrep(playerUids){
   // Pick trainer template with possible themed roster
   const trainer = TRAINER_TEMPLATES[Math.floor(Math.random() * TRAINER_TEMPLATES.length)];
   let oppIds;
-  if (trainer.theme && THEMED_ROSTER[trainer.theme]) {
-    const pool = THEMED_ROSTER[trainer.theme];
-    const shuffled = pool.sort(() => Math.random() - 0.5);
+  if (trainer.theme) {
+    // Support dual-type themes like "aqua+gale"
+    const themes = trainer.theme.includes("+") ? trainer.theme.split("+") : [trainer.theme];
+    let pool = [];
+    themes.forEach(t => {
+      if (THEMED_ROSTER[t]) pool = pool.concat(THEMED_ROSTER[t]);
+    });
+    // Deduplicate
+    pool = [...new Set(pool)].sort(() => Math.random() - 0.5);
     // Fill remaining slots from general pool if theme pool < 3
-    const fromTheme = [...shuffled];
+    const fromTheme = [...pool];
     while (fromTheme.length < 3) {
       const extra = ROSTER_DEF.map(r=>r[0]).sort(()=>Math.random()-0.5).filter(id => !fromTheme.includes(id));
       fromTheme.push(extra[0]);
@@ -523,18 +537,29 @@ function aiPickAction() {
   const personality = AI_PERSONALITIES[battle.personality] || AI_PERSONALITIES.balanced;
   const aliveFoes = battle.foe.filter(m => !m.fainted);
   
-  // Consider switching if at type disadvantage and HP is low
+  // Evaluate type disadvantage: does player have a super effective move against current AI mon?
   const bestPlyrMove = p.moves.reduce((best, mv) => {
     const s = mv.power * typeMultiplier(mv.type, f.type);
     return s > (best?.score || -1) ? {mv, score: s} : best;
   }, null);
+  const aiAtDisadvantage = bestPlyrMove && bestPlyrMove.score > 80;
   
-  const aiIsEffective = bestPlyrMove && bestPlyrMove.score > 80;
-  
-  if (aliveFoes.length > 1 && !aiIsEffective && (f.hp / f.baseHp) <= personality.switchBelowHpPct && Math.random() < personality.switchChance) {
-    const switchTo = aliveFoes.find(m => m.uid !== f.uid);
-    if (switchTo) {
-      battle.fIndex = battle.foe.indexOf(switchTo);
+  // Smart switch: pick the mon with best type resistance to player's current mon
+  if (aliveFoes.length > 1 && aiAtDisadvantage && (f.hp / f.baseHp) <= personality.switchBelowHpPct && Math.random() < personality.switchChance) {
+    let bestSwitch = null, bestResist = -1;
+    aliveFoes.forEach(candidate => {
+      if (candidate.uid === f.uid) return;
+      let totalDmg = 0;
+      p.moves.forEach(mv => {
+        const mult = typeMultiplier(mv.type, candidate.type);
+        totalDmg += mv.power * mult;
+      });
+      const avgMult = totalDmg / (p.moves.length * 100);
+      const resistScore = 1 - avgMult;
+      if (resistScore > bestResist) { bestResist = resistScore; bestSwitch = candidate; }
+    });
+    if (bestSwitch) {
+      battle.fIndex = battle.foe.indexOf(bestSwitch);
       return {kind:"switch", index: battle.fIndex};
     }
   }
@@ -543,8 +568,11 @@ function aiPickAction() {
   let best = null, bScore = -1;
   f.moves.forEach(mv => {
     const mult = typeMultiplier(mv.type, p.type);
-    const accFactor = mv.acc / 100;
-    const s = (mv.power * mult * accFactor) * (mult > 1 ? personality.dmgWeight : 1);
+    const accFactor = Math.pow(mv.acc / 100, personality.accWeight);
+    const stabBonus = mv.type === f.type ? personality.stabBonus : 1;
+    const effPower = mv.power * stabBonus;
+    const typeWeight = mult > 1 ? 1.3 : mult < 1 ? 0.7 : 1;
+    const s = effPower * mult * typeWeight * accFactor * personality.dmgWeight;
     if (s > bScore) { bScore = s; best = mv; }
   });
   return {kind:"move", move: best || f.moves[0]};
