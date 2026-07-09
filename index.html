@@ -17,7 +17,9 @@
         <div class="avatar"></div>
         <div class="details">
           <div class="name">Player <span id="player-level" class="badge">Lv.1</span></div>
-          <div class="xp-bar"><div class="xp-fill" id="player-xp-fill"></div></div>
+          <div class="xp-bar" title="Player XP"><div class="xp-fill" id="player-xp-fill"></div></div>
+          <div class="tier-label">Tier <span id="tier-level">1</span></div>
+          <div class="xp-bar tier-bar" title="Tier XP"><div class="xp-fill tier-fill" id="tier-xp-fill"></div></div>
         </div>
       </div>
       <div class="currencies">
@@ -50,15 +52,25 @@
         <div class="label">Summon</div>
         <div class="desc">100 💎</div>
       </div>
+      <div class="dash-card" id="card-explore">
+        <div class="icon-bg">🗺️</div>
+        <div class="label">Explore</div>
+        <div class="desc" id="explore-status">Ready</div>
+      </div>
+      <div class="dash-card" id="card-merge">
+        <div class="icon-bg">🧬</div>
+        <div class="label">Merge</div>
+        <div class="desc">Combine</div>
+      </div>
+      <div class="dash-card" id="card-bag">
+        <div class="icon-bg">🎒</div>
+        <div class="label">Bag</div>
+        <div class="desc">Items</div>
+      </div>
       <div class="dash-card" id="card-idle">
         <div class="icon-bg">⏳</div>
         <div class="label">Idle Base</div>
         <div class="desc" id="idle-status">Claim</div>
-      </div>
-      <div class="dash-card" id="card-settings">
-        <div class="icon-bg">⚙️</div>
-        <div class="label">Settings</div>
-        <div class="desc">Save Data</div>
       </div>
     </div>
   </section>
@@ -72,19 +84,37 @@
   <!-- MON DETAILS -->
   <section class="screen" id="screen-details">
     <div class="backrow"><button class="iconbtn" data-back="screen-roster">←</button><h2>Rift-form Details</h2></div>
-    <div class="details-card" id="mon-details-view">
-      <!-- Injected by JS -->
-    </div>
+    <div class="details-card" id="mon-details-view"></div>
   </section>
 
   <!-- TEAM SELECT -->
   <section class="screen" id="screen-select">
     <div class="backrow"><button class="iconbtn" data-back="screen-home">←</button><h2>Choose Your Three</h2></div>
-    <p class="subtitle" style="margin-bottom:10px;">Tap to add in battle order. Tap again to remove.</p>
+    <p class="subtitle" style="margin-bottom:10px;">Tap to add in battle order.</p>
     <div class="roster-grid" id="select-grid"></div>
     <div class="footer-bar">
       <button class="btn gold" id="btn-confirm-team" disabled>Confirm Team (0/3)</button>
     </div>
+  </section>
+
+  <!-- NEW: EXPLORE -->
+  <section class="screen" id="screen-explore">
+    <div class="backrow"><button class="iconbtn" data-back="screen-home">←</button><h2>Expeditions</h2></div>
+    <div id="explore-content" style="flex:1; display:flex; flex-direction:column; gap:16px;"></div>
+  </section>
+
+  <!-- NEW: MERGE -->
+  <section class="screen" id="screen-merge">
+    <div class="backrow"><button class="iconbtn" data-back="screen-home">←</button><h2>Merge Duplicates</h2></div>
+    <p class="subtitle" style="margin-bottom:10px;">Merge 4 of the same Rift-form. 3 are destroyed, giving the remaining 1 a permanent 15% random stat boost!</p>
+    <div id="merge-content" style="display:flex; flex-direction:column; gap:12px;"></div>
+  </section>
+
+  <!-- NEW: BAG -->
+  <section class="screen" id="screen-bag">
+    <div class="backrow"><button class="iconbtn" data-back="screen-home">←</button><h2>Inventory Bag</h2></div>
+    <p class="subtitle" style="margin-bottom:10px;">Tap an item to equip it to a Rift-form.</p>
+    <div id="bag-content" style="display:flex; flex-direction:column; gap:12px;"></div>
   </section>
 
   <!-- PREP -->
@@ -146,6 +176,7 @@
 
 </div>
 
+<script src="systems.js"></script>
 <script src="app.js"></script>
 <script>
   if ('serviceWorker' in navigator) {
