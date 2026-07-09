@@ -338,7 +338,7 @@ function initBagUI() {
   const container = document.getElementById("bag-content");
   container.innerHTML = "";
   
-  if (!save.bag) save.bag = { vitalberry: 5, quickfeather: 1, ironscale: 1, guardcharm: 1, steadfastsash: 1 };
+  if (!save.bag) save.bag = { vitalberry: 5, quickfeather: 1, ironscale: 1, guardcharm: 1, steadfastsash: 1, puredew: 1 };
 
   Object.keys(save.bag).forEach(itemKey => {
     const amt = save.bag[itemKey];

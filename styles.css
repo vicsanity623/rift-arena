@@ -135,6 +135,16 @@ select.btn.ghost option { background: var(--bg); color: white; }
 .hpbar-fill{ height:100%; border-radius:6px; background:var(--safe); transition:width .5s ease, background .3s ease; }
 .hpbar-fill.mid{ background:var(--warn); } .hpbar-fill.low{ background:var(--danger); }
 
+/* Weather & Status */
+.weather-bar{ text-align:center; padding:4px 10px; font-family:var(--display); font-weight:700; font-size:13px; border-bottom:1px solid var(--line); background:rgba(0,0,0,0.3); }
+.status-indicator{ display:flex; gap:4px; margin-top:3px; font-size:14px; }
+.mon.burned{ box-shadow:0 0 20px rgba(255,106,69,0.6), inset 0 0 20px rgba(255,106,69,0.3); animation:burnPulse 1s ease infinite; }
+@keyframes burnPulse{ 0%,100%{ box-shadow:0 0 20px rgba(255,106,69,0.6); } 50%{ box-shadow:0 0 35px rgba(255,106,69,0.9); } }
+.mon.frozen{ box-shadow:0 0 20px rgba(51,199,234,0.6), inset 0 0 15px rgba(51,199,234,0.2); animation:freezeShimmer 1.5s ease infinite; }
+@keyframes freezeShimmer{ 0%,100%{ filter:brightness(1) hue-rotate(0deg); } 50%{ filter:brightness(1.2) hue-rotate(-10deg) saturate(0.7); } }
+.mon.poisoned{ box-shadow:0 0 20px rgba(155,89,182,0.6), inset 0 0 15px rgba(155,89,182,0.3); animation:poisonDrip 1s ease infinite; }
+@keyframes poisonDrip{ 0%,100%{ filter:brightness(1); } 50%{ filter:brightness(0.8) saturate(0.5) hue-rotate(60deg); } }
+
 /* Sprites in battle */
 .field{ position:relative; flex:1; display:flex; align-items:center; justify-content:space-around; padding:8px 20px 18px; }
 .mon{ width:86px; height:86px; border-radius:50%; position:relative; transition:transform .25s ease, filter .25s ease; }

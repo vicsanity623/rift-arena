@@ -149,11 +149,13 @@
   <!-- BATTLE -->
   <section class="screen" id="screen-battle">
     <div class="arena" id="arena">
+      <div class="weather-bar" id="weather-display" style="display:none;"></div>
       <div class="foe-bar">
         <div class="orb sm" id="foe-orb"><div class="glyph"></div></div>
         <div class="hp-wrap">
           <div class="nmrow"><span id="foe-name">—</span><span class="lvl-badge" id="foe-level">Lv.1</span></div>
           <div class="hpbar-track"><div class="hpbar-fill" id="foe-hp"></div></div>
+          <div class="status-indicator" id="foe-status"></div>
         </div>
       </div>
       <div class="field" id="field">
@@ -165,6 +167,7 @@
         <div class="hp-wrap">
           <div class="nmrow"><span id="ally-name">—</span><span class="lvl-badge" id="ally-level">Lv.1</span></div>
           <div class="hpbar-track"><div class="hpbar-fill" id="ally-hp"></div></div>
+          <div class="status-indicator" id="ally-status"></div>
         </div>
       </div>
     </div>
