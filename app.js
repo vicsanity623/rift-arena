@@ -41,6 +41,118 @@ const TYPE_CHART = {
 };
 function typeMultiplier(atkType, defType){ return (atkType==="neutral")? 1 : ((TYPE_CHART[atkType] && TYPE_CHART[atkType][defType]) || 1); }
 
+/* ============================= TRAINER TEMPLATES & AI ============================= */
+const TRAINER_TEMPLATES = [
+  { name:"Epidemic",  theme:null, personality:"balanced",  desc:"Balanced challenger" },
+  { name:"Nightshard",theme:"ember", personality:"aggressive",desc:"Fire specialist" },
+  { name:"Vellum",    theme:"aqua", personality:"defensive", desc:"Water tactician" },
+  { name:"Kestrix",   theme:"gale", personality:"aggressive",desc:"Wind striker" },
+  { name:"Rowan",     theme:"verdant",personality:"balanced",desc:"Nature guardian" },
+  { name:"Ashvale",   theme:"stone", personality:"defensive",desc:"Rock bulwark" },
+  { name:"Voltara",   theme:"volt", personality:"balanced", desc:"Thunder master" },
+  { name:"Diremire",  theme:null, personality:"aggressive",desc:"Wildcard brawler" }
+];
+
+const AI_PERSONALITIES = {
+  aggressive: { switchChance:0.1, dmgWeight:1.2, switchBelowHpPct:0.15 },
+  balanced:   { switchChance:0.3, dmgWeight:1.0, switchBelowHpPct:0.2 },
+  defensive:  { switchChance:0.5, dmgWeight:0.8, switchBelowHpPct:0.35 }
+};
+
+const THEMED_ROSTER = {
+  ember:   ["cindrake","pyrelope"],
+  aqua:    ["tidenne","coralisk"],
+  verdant: ["verdil","thornuke"],
+  volt:    ["sparkit","voltigo"],
+  stone:   ["pebblin","boulderon"],
+  gale:    ["gustling","zephyrn"]
+};
+
+/* ============================= BATTLE SOUND EFFECTS ============================= */
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playHitSound(pitch) {
+  try {
+    const ctx = getAudioCtx(), osc = ctx.createOscillator(), gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = "sawtooth";
+    const base = pitch || 150;
+    osc.frequency.setValueAtTime(base, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(base * 0.6, ctx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.25, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+    osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.15);
+  } catch(e) {}
+}
+
+function playCritSound() {
+  try {
+    const ctx = getAudioCtx(), osc = ctx.createOscillator(), gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = "square";
+    osc.frequency.setValueAtTime(600, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 0.3);
+    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+    osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.35);
+    const osc2 = ctx.createOscillator(), gain2 = ctx.createGain();
+    osc2.connect(gain2); gain2.connect(ctx.destination);
+    osc2.type = "sine";
+    osc2.frequency.setValueAtTime(800, ctx.currentTime);
+    osc2.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.1);
+    gain2.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+    osc2.start(ctx.currentTime); osc2.stop(ctx.currentTime + 0.15);
+  } catch(e) {}
+}
+
+function playHealSound() {
+  try {
+    const ctx = getAudioCtx(), osc = ctx.createOscillator(), gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(400, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.2);
+    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+    osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.3);
+  } catch(e) {}
+}
+
+function playVictorySound() {
+  try {
+    const ctx = getAudioCtx();
+    [523, 659, 784, 1047].forEach((freq, i) => {
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.15);
+      gain.gain.setValueAtTime(0.2, ctx.currentTime + i * 0.15);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.15 + 0.3);
+      osc.start(ctx.currentTime + i * 0.15); osc.stop(ctx.currentTime + i * 0.15 + 0.3);
+    });
+  } catch(e) {}
+}
+
+function playDefeatSound() {
+  try {
+    const ctx = getAudioCtx();
+    [400, 350, 300, 200].forEach((freq, i) => {
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.2);
+      gain.gain.setValueAtTime(0.2, ctx.currentTime + i * 0.2);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.2 + 0.4);
+      osc.start(ctx.currentTime + i * 0.2); osc.stop(ctx.currentTime + i * 0.2 + 0.4);
+    });
+  } catch(e) {}
+}
+
 /* ============================= SAVE & PROGRESSION (v3) ============================= */
 const SAVE_KEY = "rift_arena_rpg_v3";
 
@@ -312,8 +424,23 @@ function startPrep(playerUids){
   // AI Level scales with Tier but caps relative to player
   const aiLvl = Math.max(1, avgPLevel + Math.floor((save.tierLevel - 1) * 0.5));
 
-  const oppPool = ROSTER_DEF.map(r=>r[0]);
-  const oppIds = oppPool.sort(()=>Math.random()-0.5).slice(0,3);
+  // Pick trainer template with possible themed roster
+  const trainer = TRAINER_TEMPLATES[Math.floor(Math.random() * TRAINER_TEMPLATES.length)];
+  let oppIds;
+  if (trainer.theme && THEMED_ROSTER[trainer.theme]) {
+    const pool = THEMED_ROSTER[trainer.theme];
+    const shuffled = pool.sort(() => Math.random() - 0.5);
+    // Fill remaining slots from general pool if theme pool < 3
+    const fromTheme = [...shuffled];
+    while (fromTheme.length < 3) {
+      const extra = ROSTER_DEF.map(r=>r[0]).sort(()=>Math.random()-0.5).filter(id => !fromTheme.includes(id));
+      fromTheme.push(extra[0]);
+    }
+    oppIds = fromTheme;
+  } else {
+    const oppPool = ROSTER_DEF.map(r=>r[0]);
+    oppIds = oppPool.sort(()=>Math.random()-0.5).slice(0,3);
+  }
 
   battle = {
     player: pData.map(m => {
@@ -323,7 +450,8 @@ function startPrep(playerUids){
     }),
     foe: oppIds.map(id => instantiateFoe(id, aiLvl)),
     pIndex: 0, fIndex: 0,
-    opponentName: ["Epidemic","Nightshard","Vellum","Kestrix","Rowan","Ashvale"][Math.floor(Math.random()*6)],
+    opponentName: trainer.name,
+    personality: trainer.personality,
     over: false
   };
 
@@ -390,23 +518,53 @@ function openSwitchPanel(forced){
   }
 }
 
+function aiPickAction() {
+  const f = activeFoe(), p = activePlayer();
+  const personality = AI_PERSONALITIES[battle.personality] || AI_PERSONALITIES.balanced;
+  const aliveFoes = battle.foe.filter(m => !m.fainted);
+  
+  // Consider switching if at type disadvantage and HP is low
+  const bestPlyrMove = p.moves.reduce((best, mv) => {
+    const s = mv.power * typeMultiplier(mv.type, f.type);
+    return s > (best?.score || -1) ? {mv, score: s} : best;
+  }, null);
+  
+  const aiIsEffective = bestPlyrMove && bestPlyrMove.score > 80;
+  
+  if (aliveFoes.length > 1 && !aiIsEffective && (f.hp / f.baseHp) <= personality.switchBelowHpPct && Math.random() < personality.switchChance) {
+    const switchTo = aliveFoes.find(m => m.uid !== f.uid);
+    if (switchTo) {
+      battle.fIndex = battle.foe.indexOf(switchTo);
+      return {kind:"switch", index: battle.fIndex};
+    }
+  }
+  
+  // Pick best move considering personality
+  let best = null, bScore = -1;
+  f.moves.forEach(mv => {
+    const mult = typeMultiplier(mv.type, p.type);
+    const accFactor = mv.acc / 100;
+    const s = (mv.power * mult * accFactor) * (mult > 1 ? personality.dmgWeight : 1);
+    if (s > bScore) { bScore = s; best = mv; }
+  });
+  return {kind:"move", move: best || f.moves[0]};
+}
+
 function playerAct(action){
   if(!awaitingInput || battle.over) return; awaitingInput = false;
   document.getElementById("action-panel").innerHTML = "";
-  let best = activeFoe().moves[0], bScore = -1;
-  activeFoe().moves.forEach(mv => {
-    const s = mv.power * typeMultiplier(mv.type, activePlayer().type);
-    if(s > bScore) { bScore = s; best = mv; }
-  });
-  resolveTurn(action, {kind:"move", move:best});
+  const aiAct = aiPickAction();
+  resolveTurn(action, aiAct);
 }
 
 function resolveTurn(pAct, aiAct){
   const logLines = []; let pActs = true, aiActs = true;
   if(pAct.kind === "switch"){ battle.pIndex = pAct.index; logLines.push(`You send out <b>${activePlayer().name}</b>!`); pActs = false; }
+  if(aiAct.kind === "switch"){ battle.fIndex = aiAct.index; logLines.push(`${battle.opponentName} sends out <b>${activeFoe().name}</b>!`); aiActs = false; }
   const order = [];
   if(pActs && aiActs) order.push(...(activePlayer().spd >= activeFoe().spd ? ["p","f"] : ["f","p"]));
   else if(aiActs) order.push("f");
+  else if(pActs) order.push("p");
   
   function doMove(side){
     if(battle.over) return;
@@ -423,6 +581,9 @@ function resolveTurn(pAct, aiAct){
     if (isCrit) raw *= 1.8;
     if(def.item === "guardcharm") raw *= 0.9;
     let dmg = Math.max(1, Math.round(raw));
+    
+    // Play hit sound
+    if (isCrit) playCritSound(); else playHitSound(mv.type === "stone" ? 100 : mv.type === "gale" ? 200 : 150);
     
     const atkEl = document.getElementById(side==="p"?"player-mon":"foe-mon");
     atkEl.classList.remove("lunge-r","lunge-l"); void atkEl.offsetWidth; atkEl.classList.add(side==="p"?"lunge-r":"lunge-l");
@@ -456,6 +617,7 @@ function resolveTurn(pAct, aiAct){
       def.itemUsed = true;
       const heal = Math.round(def.baseHp * 0.25);
       def.hp = Math.min(def.baseHp, def.hp + heal);
+      playHealSound();
       logLines.push(`<b>${def.name} consumed its Vital Berry and healed ${heal} HP!</b>`);
     }
 
@@ -467,6 +629,7 @@ function resolveTurn(pAct, aiAct){
   }
   
   order.forEach(doMove);
+  renderBattle(false);
   document.getElementById("battle-log").innerHTML = logLines.join("<br>");
   
   setTimeout(()=>{
@@ -482,6 +645,7 @@ function forcedSwitchTo(i){ battle.pIndex = i; renderBattle(true); document.getE
 
 function endBattle(won){
   battle.over = true;
+  if (won) playVictorySound(); else playDefeatSound();
   document.getElementById("end-banner").textContent = won ? "VICTORY" : "DEFEAT";
   document.getElementById("end-banner").className = "end-banner " + (won ? "win":"lose");
 
