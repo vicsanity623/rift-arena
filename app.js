@@ -35,6 +35,30 @@ const ROSTER_DEF = [
   ["zephyrn", "Zephyrn", "gale", 75, 85, 60, 100, "steadfastsash", "Cyclone Strike", "angular", 20, "Zephyrn Omega"]
 ];
 
+const VARIANTS = {
+  shadow: { name:"Shadow", icon:"🌑", desc:"Dark-infused, high ATK+SPD",statMods:{atk:1.25,spd:1.15,def:0.85,hp:0.9} },
+  crystal: { name:"Crystal", icon:"💎", desc:"Hardened, high DEF+HP",statMods:{def:1.25,hp:1.15,atk:0.85,spd:0.9} },
+  primal: { name:"Primal", icon:"⚡", desc:"Ancient power, all stats up",statMods:{atk:1.15,def:1.15,spd:1.15,hp:1.15} },
+  toxic: { name:"Toxic", icon:"☠️", desc:"Poison-infused, high SPD+ATK",statMods:{spd:1.25,atk:1.15,def:0.9,hp:0.95} }
+};
+
+const NPC_LEADERBOARD = [
+  { name:"Nightshard", vp:5200, rank:"Master", wins:342, losses:98, badge:"👑" },
+  { name:"Kestrix", vp:4800, rank:"Master", wins:289, losses:112, badge:"👑" },
+  { name:"Voltara", vp:4300, rank:"Platinum", wins:256, losses:134, badge:"🥇" },
+  { name:"Glacius", vp:4100, rank:"Platinum", wins:198, losses:87, badge:"🥇" },
+  { name:"Tecton", vp:3800, rank:"Platinum", wins:175, losses:102, badge:"🥈" },
+  { name:"Sylvara", vp:3600, rank:"Gold", wins:201, losses:145, badge:"🥈" },
+  { name:"Blitzara", vp:3400, rank:"Gold", wins:167, losses:123, badge:"🥈" },
+  { name:"Fernwood", vp:3100, rank:"Gold", wins:154, losses:119, badge:"🥉" },
+  { name:"Rowan", vp:2800, rank:"Silver", wins:132, losses:98, badge:"🥉" },
+  { name:"Ashvale", vp:2500, rank:"Silver", wins:118, losses:87, badge:"🥉" },
+  { name:"Epidemic", vp:2100, rank:"Silver", wins:89, losses:76, badge:"" },
+  { name:"Diremire", vp:1800, rank:"Bronze", wins:67, losses:54, badge:"" },
+  { name:"Shadoom", vp:1500, rank:"Bronze", wins:45, losses:38, badge:"" },
+  { name:"Vellum", vp:1200, rank:"Bronze", wins:32, losses:41, badge:"" },
+];
+
 const TYPE_CHART = {
   ember: { verdant: 2, aqua: 0.5, stone: 0.5 }, aqua: { ember: 2, stone: 2, verdant: 0.5, volt: 0.5 },
   verdant: { aqua: 2, stone: 2, ember: 0.5, gale: 0.5 }, volt: { aqua: 2, gale: 2, verdant: 0.5, stone: 0 },
@@ -280,10 +304,11 @@ function generateDefaultSave() {
     dojo: { active: false },
     dailyQuests: { date: "", quests: [] },
     bag: { vitalberry: 5, quickfeather: 2, ironscale: 2, puredew: 1 },
-    mons: []
+    mons: [],
+    matchHistory: []
   };
   ["cindrake", "tidenne", "verdil", "sparkit"].forEach((id, i) => {
-    save.mons.push({ uid: "start_" + i, baseId: id, level: 1, xp: 0, heldItem: "none", mergeBonuses: {}, onExpedition: false, evolved: false });
+    save.mons.push({ uid: "start_" + i, baseId: id, level: 1, xp: 0, heldItem: "none", mergeBonuses: {}, onExpedition: false, evolved: false, variant: null });
   });
   return save;
 }
@@ -292,7 +317,8 @@ let save = (function () {
   let s;
   try { const raw = localStorage.getItem(SAVE_KEY); if (raw) s = { ...generateDefaultSave(), ...JSON.parse(raw) }; } catch (e) { }
   if (!s) s = generateDefaultSave();
-  s.mons.forEach(m => { if (m.evolved === undefined) m.evolved = false; });
+  s.mons.forEach(m => { if (m.evolved === undefined) m.evolved = false; if (m.variant === undefined) m.variant = null; });
+  if (!s.matchHistory) s.matchHistory = [];
   if (!s.shopStock) s.shopStock = null;
   return s;
 })();
@@ -312,30 +338,105 @@ function getMonData(uid) {
   const defBonus = 1 + (mSave.mergeBonuses.def || 0);
   const spdBonus = 1 + (mSave.mergeBonuses.spd || 0);
 
+  const variantKey = mSave.variant || null;
+  const variantDef = variantKey ? VARIANTS[variantKey] : null;
+  const vMod = variantDef ? variantDef.statMods : { hp:1, atk:1, def:1, spd:1 };
+
   const evoLevel = def[10] || 0;
   const evoName = def[11] || "";
   const evolved = mSave.evolved || false;
-  const displayName = evolved ? evoName : def[1];
+  const displayName = evolved ? evoName : (variantDef ? variantDef.icon + " " + variantDef.name + " " + def[1] : def[1]);
+  const displayType = variantDef && variantDef.typeOverride ? variantDef.typeOverride : def[2];
 
   return {
-    uid: mSave.uid, baseId: def[0], name: displayName, type: def[2],
-    baseHp: Math.floor(def[3] * scale * hpBonus),
-    atk: Math.floor(def[4] * scale * atkBonus),
-    def: Math.floor(def[5] * scale * defBonus),
-    spd: Math.floor(def[6] * scale * spdBonus),
+    uid: mSave.uid, baseId: def[0], name: displayName, type: displayType,
+    baseHp: Math.floor(def[3] * scale * hpBonus * vMod.hp),
+    atk: Math.floor(def[4] * scale * atkBonus * vMod.atk),
+    def: Math.floor(def[5] * scale * defBonus * vMod.def),
+    spd: Math.floor(def[6] * scale * spdBonus * vMod.spd),
     item: mSave.heldItem, sigName: def[8], shape: def[9],
     level: lvl, xp: mSave.xp, onExpedition: mSave.onExpedition,
     maxXp: getMonMaxXp(lvl),
     evolvesAt: evoLevel,
     evoName: evoName,
     evolved: evolved,
-    moves: [BASH, MOVES[def[2]], move(def[8], def[2], 80, 85)]
+    variant: variantKey,
+    variantDef: variantDef,
+    moves: [BASH, MOVES[displayType], move(def[8], displayType, 80, 85)]
   };
 }
 
 function rankForVP(vp) {
   if (vp < 1500) return "Bronze"; if (vp < 2500) return "Silver";
   if (vp < 3500) return "Gold"; if (vp < 4500) return "Platinum"; return "Master";
+}
+
+function initLeaderboardUI() {
+  const fmt = typeof window.formatNum === "function" ? window.formatNum : (n => n);
+  const container = document.getElementById("leaderboard-content");
+  container.innerHTML = "";
+
+  const sorted = [...NPC_LEADERBOARD].sort((a,b) => b.vp - a.vp);
+  let playerIdx = -1;
+  for (let i = 0; i < sorted.length; i++) {
+    if (save.vp > sorted[i].vp) { playerIdx = i; break; }
+  }
+  if (playerIdx === -1) playerIdx = sorted.length;
+
+  let html = `<div class="lb-header">
+    <div class="lb-player-spot">
+      <div class="lb-rank-icon">${playerIdx === 0 ? "👑" : playerIdx < 3 ? "🥇" : playerIdx < 5 ? "🥈" : "🥉"}</div>
+      <div>
+        <div class="lb-player-name">You <span class="badge">${rankForVP(save.vp)}</span></div>
+        <div class="lb-player-stats">${fmt(save.vp)} VP · ${save.wins}W ${save.losses}L</div>
+      </div>
+      <div class="lb-pos">#${playerIdx + 1}</div>
+    </div>
+  </div>`;
+
+  html += `<div class="lb-ladder"><div class="lb-ladder-title">Arena Rankings</div>`;
+  sorted.forEach((npc, i) => {
+    const isPlayerPos = i === playerIdx;
+    html += `<div class="lb-row ${isPlayerPos ? 'lb-row-you' : ''}">
+      <div class="lb-rank">${i < 3 ? npc.badge : "#" + (i + 1)}</div>
+      <div class="lb-orb t-${["ember","aqua","verdant","volt","stone","gale"][i % 6]}"><div class="glyph"></div></div>
+      <div class="lb-info">
+        <div class="lb-npc-name">${npc.name}</div>
+        <div class="lb-npc-stats">${npc.rank} · ${npc.wins}W ${npc.losses}L</div>
+      </div>
+      <div class="lb-vp">${fmt(npc.vp)}</div>
+    </div>`;
+    if (isPlayerPos) {
+      html += `<div class="lb-row lb-row-player">
+        <div class="lb-rank">#${playerIdx + 1}</div>
+        <div class="lb-orb t-${["ember","aqua","verdant","volt","stone","gale"][playerIdx % 6]}"><div class="glyph"></div></div>
+        <div class="lb-info">
+          <div class="lb-npc-name">You (${rankForVP(save.vp)})</div>
+          <div class="lb-npc-stats">${fmt(save.vp)} VP</div>
+        </div>
+        <div class="lb-vp" style="color:var(--gold);">${fmt(save.vp)}</div>
+      </div>`;
+    }
+  });
+  html += `</div>`;
+
+  html += `<div class="lb-history"><div class="lb-ladder-title">Match History</div>`;
+  if (save.matchHistory.length === 0) {
+    html += `<div class="lb-row" style="justify-content:center; color:var(--text-dim);">No matches played yet.</div>`;
+  } else {
+    save.matchHistory.slice(0, 10).forEach(m => {
+      const cls = m.won ? "lb-hist-win" : "lb-hist-loss";
+      const sign = m.vpChange > 0 ? "+" : "";
+      html += `<div class="lb-row ${cls}">
+        <div class="lb-hist-result">${m.won ? "WIN" : "LOSS"}</div>
+        <div class="lb-info"><div class="lb-npc-name">vs ${m.opponent}</div></div>
+        <div class="lb-vp">${sign}${m.vpChange} VP</div>
+      </div>`;
+    });
+  }
+  html += `</div>`;
+
+  container.innerHTML = html;
 }
 
 /* ============================= UI NAVIGATION ============================= */
@@ -392,11 +493,18 @@ document.getElementById("card-summon").addEventListener("click", () => {
 
   const choice = ROSTER_DEF[Math.floor(Math.random() * ROSTER_DEF.length)];
   const uid = Date.now().toString() + Math.floor(Math.random() * 1000);
-  save.mons.push({ uid: uid, baseId: choice[0], level: 1, xp: 0, heldItem: "none", mergeBonuses: {}, onExpedition: false, evolved: false });
+  const variantRoll = Math.random();
+  let variant = null;
+  if (variantRoll < 0.10) {
+    const vKeys = Object.keys(VARIANTS);
+    variant = vKeys[Math.floor(Math.random() * vKeys.length)];
+  }
+  save.mons.push({ uid: uid, baseId: choice[0], level: 1, xp: 0, heldItem: "none", mergeBonuses: {}, onExpedition: false, evolved: false, variant: variant });
 
   if (typeof trackQuestProgress === "function") trackQuestProgress("summon", 1);
   saveGame(); refreshHome();
-  alert(`✨ Summoned a new ${choice[1]}! Added to roster.`);
+  const vTag = variant ? " " + VARIANTS[variant].icon + " " + VARIANTS[variant].name : "";
+  alert(`✨ Summoned a new${vTag} ${choice[1]}! Added to roster.`);
 });
 
 // Hooks to systems.js
@@ -463,6 +571,18 @@ if (document.getElementById("card-tournament")) {
     }
   });
 }
+if (document.getElementById("card-leaderboard")) {
+  document.getElementById("card-leaderboard").addEventListener("click", () => {
+    initLeaderboardUI();
+    show("screen-leaderboard");
+  });
+}
+if (document.getElementById("card-lab")) {
+  document.getElementById("card-lab").addEventListener("click", () => {
+    if (typeof initLabUI === "function") initLabUI();
+    show("screen-lab");
+  });
+}
 refreshHome();
 
 /* ============================= ROSTER & DETAILS ============================= */
@@ -476,12 +596,13 @@ function buildRosterView() {
     const m = getMonData(mSave.uid);
     const card = document.createElement("div");
     card.className = "cmon-card " + (m.onExpedition ? "locked" : "");
+    const vBadge = m.variant ? `<span class="var-badge var-${m.variant}">${m.variantDef.icon}</span>` : "";
     card.innerHTML = `
       <div class="row1">
         <div class="orb t-${m.type}"><div class="glyph"></div></div>
         <div style="flex:1;">
-          <div class="name">${m.name} <span class="badge">Lv.${m.level}</span></div>
-          <div class="type">${m.type} ${m.onExpedition ? '(Exploring)' : ''}</div>
+          <div class="name">${vBadge}${m.name} <span class="badge">Lv.${m.level}</span></div>
+          <div class="type">${m.type} ${m.onExpedition ? '(Exploring)' : ''} ${m.variant ? m.variantDef.name : ''}</div>
         </div>
       </div>
       <div class="xp-bar" style="width:100%; margin-top:4px;"><div class="xp-fill" style="width:${(m.xp / m.maxXp) * 100}%"></div></div>
@@ -502,9 +623,10 @@ function showMonDetails(m) {
       <div class="stat-val">${val}</div>
     </div>`;
 
+  const vTag = m.variant ? `<div class="var-badge var-${m.variant}" style="display:inline-block; font-size:13px; padding:2px 10px;">${m.variantDef.icon} ${m.variantDef.name}</div>` : "";
   view.innerHTML = `
     <div class="orb mon-big-orb t-${m.type}"><div class="glyph"></div></div>
-    <div style="text-align:center; font-family:var(--display); font-weight:800; font-size:22px;">${m.name} <span class="badge">Lv.${m.level}</span></div>
+    <div style="text-align:center; font-family:var(--display); font-weight:800; font-size:22px;">${vTag} ${m.name} <span class="badge">Lv.${m.level}</span></div>
     
     <div style="display:flex; flex-direction:column; gap:8px; margin-top:10px;">
       ${drawStat("HP", m.baseHp, 300)}
@@ -1341,6 +1463,12 @@ function endBattle(won) {
   save.gold += goldReward;
   save.playerXp += xpReward;
   if (won) save.wins++; else save.losses++;
+
+  save.matchHistory.unshift({
+    date: Date.now(), opponent: battle.opponentName,
+    won: won, vpChange: vpChange, vp: save.vp
+  });
+  if (save.matchHistory.length > 20) save.matchHistory.length = 20;
 
   let playerLvlUp = false;
   while (save.playerXp >= getPlayerMaxXp(save.playerLevel)) {

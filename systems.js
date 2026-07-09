@@ -564,7 +564,7 @@ function claimExplore() {
     const oppPool = ROSTER_DEF.map(r=>r[0]);
     const rareId = oppPool[Math.floor(Math.random()*oppPool.length)];
     const def = ROSTER_DEF.find(r => r[0] === rareId);
-    save.mons.push({ uid: Date.now().toString(), baseId: rareId, level: 1, xp: 0, heldItem: "none", mergeBonuses: {}, onExpedition: false, evolved: false });
+    save.mons.push({ uid: Date.now().toString(), baseId: rareId, level: 1, xp: 0, heldItem: "none", mergeBonuses: {}, onExpedition: false, evolved: false, variant: null });
     rareMsg = `<br><br>✨ <b>RARE FIND!</b> Found a wild ${def[1]}!`;
   }
   
@@ -851,4 +851,132 @@ function purchaseShopItem(idx) {
   alert(`Purchased ${item.name}!`);
   initShopUI();
   refreshHome();
+}
+
+// --- LAB / BREEDING SYSTEM ---
+function initLabUI() {
+  const container = document.getElementById("lab-content");
+  container.innerHTML = "";
+
+  const eligibleMons = save.mons.filter(m => !m.onExpedition && m.level >= 10);
+  if (eligibleMons.length < 2) {
+    container.innerHTML = `<div class="details-card" style="text-align:center;">
+      <h3>🧬 Breeding Lab</h3>
+      <p style="color:var(--text-dim);">Need at least 2 Rift-forms at Lv.10+ to breed. Send them on expeditions or train them!</p>
+      <button class="btn ghost" data-back="screen-home">Back</button>
+    </div>`;
+    return;
+  }
+
+  const breedCost = 300;
+
+  let p1Html = `<select id="lab-parent1" class="btn ghost" style="border:1px solid var(--line); color:white; padding:10px;">`;
+  let p2Html = `<select id="lab-parent2" class="btn ghost" style="border:1px solid var(--line); color:white; padding:10px;">`;
+  eligibleMons.forEach(m => {
+    const data = getMonData(m.uid);
+    const vTag = m.variant ? ` ${VARIANTS[m.variant].icon}` : "";
+    const opt = `<option value="${m.uid}">${vTag}${data.name} (Lv.${data.level})</option>`;
+    p1Html += opt;
+    p2Html += opt;
+  });
+  p1Html += `</select>`;
+  p2Html += `</select>`;
+
+  container.innerHTML = `<div class="details-card">
+    <h3>🧬 Breeding Lab</h3>
+    <p class="subtitle">Breed 2 Lv.10+ Rift-forms to create a variant offspring!</p>
+    
+    <label style="font-size:12px; color:var(--text-dim);">Parent A:</label>
+    ${p1Html}
+    
+    <label style="font-size:12px; color:var(--text-dim); margin-top:10px;">Parent B:</label>
+    ${p2Html}
+    
+    <div class="lab-preview" id="lab-preview" style="margin:12px 0; padding:12px; background:var(--card-hi); border-radius:12px; border:1px solid var(--line); text-align:center; min-height:60px; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+      <div style="color:var(--text-dim); font-size:13px;">Select two parents to see breed preview</div>
+    </div>
+    
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
+      <span style="color:var(--gold); font-family:var(--mono);">🪙 ${formatNum(breedCost)}</span>
+      <span id="lab-status" style="font-size:12px; color:var(--text-dim);"></span>
+    </div>
+    
+    <button class="btn gold" id="btn-breed" style="margin-top:12px;" disabled>Select Two Different Parents</button>
+  </div>`;
+
+  function updateBreedPreview() {
+    const uid1 = document.getElementById("lab-parent1").value;
+    const uid2 = document.getElementById("lab-parent2").value;
+    const btn = document.getElementById("btn-breed");
+    const preview = document.getElementById("lab-preview");
+    const status = document.getElementById("lab-status");
+
+    if (uid1 === uid2) {
+      btn.disabled = true;
+      btn.textContent = "Must Select Two Different Parents";
+      preview.innerHTML = `<div style="color:var(--danger); font-size:13px;">⚠️ Select two different Rift-forms</div>`;
+      return;
+    }
+
+    const m1 = save.mons.find(m => m.uid === uid1);
+    const m2 = save.mons.find(m => m.uid === uid2);
+    if (!m1 || !m2) return;
+
+    const def1 = ROSTER_DEF.find(r => r[0] === m1.baseId);
+    const def2 = ROSTER_DEF.find(r => r[0] === m2.baseId);
+
+    // Randomly pick one parent's baseId and a random variant
+    const chosenDef = Math.random() < 0.5 ? def1 : def2;
+    const vKeys = Object.keys(VARIANTS);
+    const childVariant = vKeys[Math.floor(Math.random() * vKeys.length)];
+    const vDef = VARIANTS[childVariant];
+    const childType = vDef.typeOverride || chosenDef[2];
+
+    const canAfford = save.gold >= breedCost;
+    btn.disabled = !canAfford;
+    btn.textContent = canAfford ? `🧬 Breed (${formatNum(breedCost)}🪙)` : "Not Enough Gold";
+
+    preview.innerHTML = `
+      <div style="font-weight:bold; font-size:15px; color:var(--safe);"><span class="var-badge var-${childVariant}" style="display:inline-block;">${vDef.icon}</span> ${vDef.name} ${chosenDef[1]}</div>
+      <div style="font-size:12px; color:var(--text-dim);">Type: ${childType} · ${vDef.desc}</div>
+      <div style="font-size:11px; color:var(--gold-dim); margin-top:4px;">Parents: ${def1[1]} (Lv.${m1.level}) × ${def2[1]} (Lv.${m2.level})</div>
+    `;
+  }
+
+  document.getElementById("lab-parent1").onchange = updateBreedPreview;
+  document.getElementById("lab-parent2").onchange = updateBreedPreview;
+
+  document.getElementById("btn-breed").onclick = () => {
+    const uid1 = document.getElementById("lab-parent1").value;
+    const uid2 = document.getElementById("lab-parent2").value;
+    if (uid1 === uid2) return alert("Select two different parents!");
+
+    const m1 = save.mons.find(m => m.uid === uid1);
+    const m2 = save.mons.find(m => m.uid === uid2);
+    if (!m1 || !m2) return;
+
+    if (save.gold < breedCost) return alert("Not enough gold!");
+    save.gold -= breedCost;
+
+    const def1 = ROSTER_DEF.find(r => r[0] === m1.baseId);
+    const def2 = ROSTER_DEF.find(r => r[0] === m2.baseId);
+    const chosenDef = Math.random() < 0.5 ? def1 : def2;
+    const vKeys = Object.keys(VARIANTS);
+    const childVariant = vKeys[Math.floor(Math.random() * vKeys.length)];
+    const vDef = VARIANTS[childVariant];
+
+    const uid = Date.now().toString() + Math.floor(Math.random() * 1000);
+    save.mons.push({
+      uid, baseId: chosenDef[0], level: 1, xp: 0,
+      heldItem: "none", mergeBonuses: {}, onExpedition: false,
+      evolved: false, variant: childVariant
+    });
+
+    saveGame();
+    alert(`🧬 Breeding successful!\n\nCreated: ${vDef.icon} ${vDef.name} ${chosenDef[1]} (Lv.1)\nParents: ${def1[1]} × ${def2[1]}`);
+    refreshHome();
+    initLabUI();
+  };
+
+  updateBreedPreview();
 }

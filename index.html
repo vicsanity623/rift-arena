@@ -92,6 +92,16 @@
         <div class="label">Idle Base</div>
         <div class="desc" id="idle-status">Claim</div>
       </div>
+      <div class="dash-card" id="card-leaderboard">
+        <div class="icon-bg">🏅</div>
+        <div class="label">Leaderboard</div>
+        <div class="desc">Rankings</div>
+      </div>
+      <div class="dash-card" id="card-lab">
+        <div class="icon-bg">🧬</div>
+        <div class="label">Breeding Lab</div>
+        <div class="desc">Create Variants</div>
+      </div>
     </div>
   </section>
 
@@ -182,6 +192,18 @@
     <div class="backrow"><h2 id="tourney-title">Quarter-Finals</h2></div>
     <div id="bracket-view" style="flex:1;"></div>
     <div class="footer-bar"><button class="btn ghost" id="btn-tourney-leave">Leave Tournament</button></div>
+  </section>
+
+  <!-- LEADERBOARD -->
+  <section class="screen" id="screen-leaderboard">
+    <div class="backrow"><button class="iconbtn" data-back="screen-home">←</button><h2>PvP Leaderboard</h2></div>
+    <div id="leaderboard-content" style="flex:1; overflow-y:auto;"></div>
+  </section>
+
+  <!-- BREEDING LAB -->
+  <section class="screen" id="screen-lab">
+    <div class="backrow"><button class="iconbtn" data-back="screen-home">←</button><h2>Breeding Lab</h2></div>
+    <div id="lab-content" style="flex:1; display:flex; flex-direction:column; gap:16px;"></div>
   </section>
 
   <!-- PREP -->
