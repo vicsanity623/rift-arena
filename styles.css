@@ -252,4 +252,42 @@ select.btn.ghost option { background: var(--bg); color: white; }
 .tourney-result-banner{ font-family:var(--display); font-weight:800; font-size:28px; text-align:center; padding:20px 0; }
 .tourney-result-box{ background:var(--card-hi); border:1px solid var(--line); border-radius:12px; padding:20px; display:flex; flex-direction:column; gap:8px; margin:10px 0; }
 
+/* Variant Badges */
+.var-badge{ font-size:10px; padding:1px 6px; border-radius:6px; margin-right:4px; font-weight:700; display:inline-block; }
+.var-badge.var-shadow{ background:#2d1b4e; color:#c084fc; border:1px solid #7c3aed; }
+.var-badge.var-crystal{ background:#1a3a5c; color:#60a5fa; border:1px solid #3b82f6; }
+.var-badge.var-primal{ background:#3b2f1a; color:#fbbf24; border:1px solid #f59e0b; }
+.var-badge.var-toxic{ background:#1a3b2a; color:#6ee7b7; border:1px solid #10b981; }
+
+/* Leaderboard */
+.lb-header{ background:var(--card); border:1.5px solid var(--gold); border-radius:16px; padding:16px; margin-bottom:14px; }
+.lb-player-spot{ display:flex; align-items:center; gap:12px; }
+.lb-rank-icon{ font-size:24px; }
+.lb-player-name{ font-family:var(--display); font-weight:800; font-size:16px; display:flex; align-items:center; gap:6px; }
+.lb-player-stats{ font-size:12px; color:var(--text-dim); font-family:var(--mono); }
+.lb-pos{ margin-left:auto; font-family:var(--display); font-weight:800; font-size:20px; color:var(--gold); }
+.lb-ladder, .lb-history{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px; margin-bottom:12px; }
+.lb-ladder-title{ font-family:var(--display); font-weight:700; font-size:13px; color:var(--text-dim); margin-bottom:8px; text-transform:uppercase; letter-spacing:.5px; }
+.lb-row{ display:flex; align-items:center; gap:10px; padding:8px 6px; border-radius:10px; }
+.lb-row:nth-child(even){ background:rgba(255,255,255,.02); }
+.lb-row-you{ background:rgba(230,185,77,.08); border:1px solid var(--line); }
+.lb-row-player{ background:rgba(230,185,77,.15); border:1px solid var(--gold); }
+.lb-rank{ width:28px; text-align:center; font-family:var(--display); font-weight:700; font-size:12px; color:var(--gold-dim); }
+.lb-orb{ width:24px; height:24px; border-radius:50%; flex:0 0 auto; }
+.lb-orb.t-ember{ background:conic-gradient(from 140deg, #ff6a45, #7a331f); }
+.lb-orb.t-aqua{ background:conic-gradient(from 140deg, #33c7ea, #185f70); }
+.lb-orb.t-verdant{ background:conic-gradient(from 140deg, #5fd66b, #2d6633); }
+.lb-orb.t-volt{ background:conic-gradient(from 140deg, #f4d33c, #7a691e); }
+.lb-orb.t-stone{ background:conic-gradient(from 140deg, #c98a52, #604227); }
+.lb-orb.t-gale{ background:conic-gradient(from 140deg, #9db4ff, #4b5780); }
+.lb-info{ flex:1; min-width:0; }
+.lb-npc-name{ font-weight:600; font-size:13px; }
+.lb-npc-stats{ font-size:10px; color:var(--text-dim); font-family:var(--mono); }
+.lb-vp{ font-family:var(--mono); font-size:13px; color:var(--text-dim); }
+.lb-hist-win{ border-left:3px solid var(--safe); }
+.lb-hist-loss{ border-left:3px solid var(--danger); }
+.lb-hist-result{ font-family:var(--display); font-weight:800; font-size:11px; width:40px; }
+.lb-hist-win .lb-hist-result{ color:var(--safe); }
+.lb-hist-loss .lb-hist-result{ color:var(--danger); }
+
 ::-webkit-scrollbar{ width:6px; } ::-webkit-scrollbar-thumb{ background:var(--line); border-radius:6px; }
