@@ -153,11 +153,21 @@ select.btn.ghost option { background: var(--bg); color: white; }
 .mon .eye.l{ left:26px; } .mon .eye.r{ right:26px; }
 .mon.hit{ animation:hitflash .35s ease; }
 @keyframes hitflash{ 0%{ filter:brightness(1);} 30%{ filter:brightness(2.3) saturate(0);} 100%{ filter:brightness(1);} }
+.mon.crit-hit{ animation:critflash .45s ease; }
+@keyframes critflash{ 0%{ filter:brightness(1) hue-rotate(0deg);} 25%{ filter:brightness(2.8) saturate(0) hue-rotate(180deg);} 50%{ filter:brightness(1.6) hue-rotate(90deg);} 100%{ filter:brightness(1) hue-rotate(0deg);} }
 .mon.faint{ animation:faintdrop .5s ease forwards; }
 @keyframes faintdrop{ to{ transform:translateY(40px) scale(.6); opacity:0; } }
 .mon.lunge-r{ animation:lungeR .38s ease; } .mon.lunge-l{ animation:lungeL .38s ease; }
 @keyframes lungeR{ 40%{ transform:translateX(18px) scale(1.05);} }
 @keyframes lungeL{ 40%{ transform:translateX(-18px) scale(1.05);} }
+
+.shake{ animation:shake .4s ease; }
+@keyframes shake{ 0%,100%{ transform:translateX(0);} 20%{ transform:translateX(-6px) rotate(-1deg);} 40%{ transform:translateX(6px) rotate(1deg);} 60%{ transform:translateX(-4px);} 80%{ transform:translateX(4px);} }
+.dmg-float{ position:absolute; font-family:var(--display); font-weight:800; font-size:20px; color:var(--gold); pointer-events:none; z-index:10; animation:floatUp .9s ease forwards; text-shadow:0 2px 4px rgba(0,0,0,.6); }
+.dmg-float.crit{ font-size:28px; color:var(--danger); text-shadow:0 0 12px rgba(255,92,108,.6); }
+@keyframes floatUp{ 0%{ opacity:1; transform:translateY(0) scale(1);} 100%{ opacity:0; transform:translateY(-60px) scale(1.2);} }
+.arena.shake{ animation:arenaShake .35s ease; }
+@keyframes arenaShake{ 0%,100%{ transform:translateX(0);} 15%{ transform:translateX(-4px) rotate(-.5deg);} 30%{ transform:translateX(4px) rotate(.5deg);} 50%{ transform:translateX(-2px);} 70%{ transform:translateX(2px);} }
 
 /* Battle Logs and Actions */
 .log{ background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px 12px; font-size:13px; min-height:38px; color:var(--text-dim); margin-bottom:10px; }

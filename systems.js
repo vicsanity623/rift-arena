@@ -1,5 +1,124 @@
 "use strict";
 
+// --- DAILY QUESTS ---
+const QUEST_POOL = [
+  { type: "win_battles", target: 3, desc: "Win 3 Ranked Battles", reward: { gems: 20, gold: 150 } },
+  { type: "win_battles", target: 5, desc: "Win 5 Ranked Battles", reward: { gems: 40, gold: 300 } },
+  { type: "earn_gold", target: 500, desc: "Earn 500 Gold", reward: { gems: 15, gold: 100 } },
+  { type: "earn_gold", target: 1000, desc: "Earn 1,000 Gold", reward: { gems: 30, gold: 250 } },
+  { type: "explore", target: 1, desc: "Complete 1 Expedition", reward: { gems: 10, gold: 100 } },
+  { type: "explore", target: 3, desc: "Complete 3 Expeditions", reward: { gems: 25, gold: 200 } },
+  { type: "level_up", target: 2, desc: "Level Up Any Rift-Form 2 Times", reward: { gems: 15, gold: 150 } },
+  { type: "level_up", target: 5, desc: "Level Up Any Rift-Form 5 Times", reward: { gems: 35, gold: 300 } },
+  { type: "summon", target: 1, desc: "Summon 1 Creature", reward: { gems: 10, gold: 50 } },
+  { type: "summon", target: 3, desc: "Summon 3 Creatures", reward: { gems: 25, gold: 150 } },
+];
+
+function getDateString() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function seededRandom(seed) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) {
+    h = ((h << 5) - h) + seed.charCodeAt(i);
+    h = h & h;
+  }
+  return function() {
+    h = (h * 16807) % 2147483647;
+    return (h - 1) / 2147483646;
+  };
+}
+
+function generateDailyQuests() {
+  const date = getDateString();
+  const rng = seededRandom("rift_quests_" + date);
+  const shuffled = [...QUEST_POOL].sort(() => rng() - 0.5);
+  return shuffled.slice(0, 3).map(q => ({
+    ...q,
+    progress: 0,
+    claimed: false,
+    id: q.type + "_" + date + "_" + Math.floor(rng() * 1000)
+  }));
+}
+
+function ensureDailyQuests() {
+  if (!save.dailyQuests || save.dailyQuests.date !== getDateString()) {
+    save.dailyQuests = {
+      date: getDateString(),
+      quests: generateDailyQuests()
+    };
+    saveGame();
+  }
+}
+
+function trackQuestProgress(type, amount) {
+  ensureDailyQuests();
+  let anyChanged = false;
+  save.dailyQuests.quests.forEach(q => {
+    if (!q.claimed && q.type === type) {
+      q.progress = Math.min(q.target, q.progress + amount);
+      if (q.progress >= q.target) anyChanged = true;
+    }
+  });
+  if (anyChanged) saveGame();
+}
+
+function initQuestsUI() {
+  ensureDailyQuests();
+  const container = document.getElementById("quests-content");
+  container.innerHTML = "";
+
+  save.dailyQuests.quests.forEach((q, i) => {
+    const done = q.progress >= q.target;
+    const claimed = q.claimed;
+    const pct = Math.min(100, (q.progress / q.target) * 100);
+
+    const card = document.createElement("div");
+    card.className = "details-card quest-card" + (claimed ? " claimed" : "");
+    card.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <div style="flex:1;">
+          <div style="font-weight:bold; font-size:14px;">${q.desc}</div>
+          <div class="quest-progress" style="margin-top:6px;">
+            <div class="xp-bar" style="width:100%;"><div class="xp-fill" style="width:${pct}%;"></div></div>
+            <div style="font-size:11px; color:var(--text-dim); font-family:var(--mono); margin-top:2px;">${q.progress}/${q.target}</div>
+          </div>
+          <div style="font-size:11px; color:var(--gold); margin-top:4px;">
+            <span>🪙 ${formatNum(q.reward.gold)}</span>
+            <span style="margin-left:8px;">💎 ${formatNum(q.reward.gems)}</span>
+          </div>
+        </div>
+        <button class="btn ghost quest-claim-btn" style="width:auto; padding:8px 16px; flex-shrink:0;" ${!done || claimed ? 'disabled' : ''}>
+          ${claimed ? "Claimed" : done ? "Claim" : "—"}
+        </button>
+      </div>
+    `;
+
+    if (done && !claimed) {
+      card.querySelector(".quest-claim-btn").onclick = () => claimQuestReward(i);
+    }
+
+    container.appendChild(card);
+  });
+
+  const allClaimed = save.dailyQuests.quests.every(q => q.claimed);
+  document.getElementById("quests-dash-status").textContent = allClaimed ? "Done!" : save.dailyQuests.quests.filter(q => q.progress >= q.target && !q.claimed).length + " ready";
+}
+
+function claimQuestReward(index) {
+  const q = save.dailyQuests.quests[index];
+  if (!q || q.claimed || q.progress < q.target) return;
+
+  q.claimed = true;
+  save.gold += q.reward.gold;
+  save.gems += q.reward.gems;
+  saveGame();
+  refreshHome();
+  initQuestsUI();
+  alert(`Quest complete!\n\nRewards:\n🪙 ${formatNum(q.reward.gold)} Gold\n💎 ${formatNum(q.reward.gems)} Gems`);
+}
+
 // --- NUMBER FORMATTING ---
 function formatNum(num) {
   if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';

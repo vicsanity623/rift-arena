@@ -62,6 +62,11 @@
         <div class="label">Merge</div>
         <div class="desc">Combine</div>
       </div>
+      <div class="dash-card" id="card-quests">
+        <div class="icon-bg">📋</div>
+        <div class="label">Quests</div>
+        <div class="desc" id="quests-dash-status">Daily</div>
+      </div>
       <div class="dash-card" id="card-bag">
         <div class="icon-bg">🎒</div>
         <div class="label">Bag</div>
@@ -115,6 +120,13 @@
     <div class="backrow"><button class="iconbtn" data-back="screen-home">←</button><h2>Inventory Bag</h2></div>
     <p class="subtitle" style="margin-bottom:10px;">Tap an item to equip it to a Rift-form.</p>
     <div id="bag-content" style="display:flex; flex-direction:column; gap:12px;"></div>
+  </section>
+
+  <!-- DAILY QUESTS -->
+  <section class="screen" id="screen-quests">
+    <div class="backrow"><button class="iconbtn" data-back="screen-home">←</button><h2>Daily Quests</h2></div>
+    <p class="subtitle" style="margin-bottom:12px;">Complete quests to earn bonus rewards. Resets daily.</p>
+    <div id="quests-content" style="display:flex; flex-direction:column; gap:12px;"></div>
   </section>
 
   <!-- PREP -->
