@@ -303,6 +303,8 @@ function generateDefaultSave() {
     explore: { active: false },
     dojo: { active: false },
     dailyQuests: { date: "", quests: [] },
+    dailyLogin: { date: "", streak: 0, claimed: false },
+    guild: null,
     bag: { vitalberry: 5, quickfeather: 2, ironscale: 2, puredew: 1 },
     mons: [],
     matchHistory: []
@@ -320,6 +322,8 @@ let save = (function () {
   s.mons.forEach(m => { if (m.evolved === undefined) m.evolved = false; if (m.variant === undefined) m.variant = null; });
   if (!s.matchHistory) s.matchHistory = [];
   if (!s.shopStock) s.shopStock = null;
+  if (!s.dailyLogin) s.dailyLogin = { date: "", streak: 0, claimed: false };
+  if (!s.guild) s.guild = null;
   return s;
 })();
 function saveGame() { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); }
@@ -467,6 +471,8 @@ function refreshHome() {
   if (typeof updateExploreDash === "function") updateExploreDash();
   if (typeof updateDojoDash === "function") updateDojoDash();
   if (typeof updateTourneyDashboard === "function") updateTourneyDashboard();
+  if (typeof initDailyLoginUI === "function") initDailyLoginUI();
+  if (typeof initGuildUI === "function") initGuildUI();
 }
 
 setInterval(() => {
