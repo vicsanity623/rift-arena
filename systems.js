@@ -1,5 +1,123 @@
 "use strict";
 
+// --- DAILY LOGIN REWARDS ---
+const DAILY_LOGIN_REWARDS = [
+  { day: 1,  items: [{ type: "gold", amount: 100 }, { type: "gems", amount: 10 }] },
+  { day: 2,  items: [{ type: "gold", amount: 150 }, { type: "item", key: "vitalberry", amount: 1 }] },
+  { day: 3,  items: [{ type: "gold", amount: 200 }, { type: "gems", amount: 15 }] },
+  { day: 4,  items: [{ type: "gold", amount: 250 }, { type: "item", key: "quickfeather", amount: 1 }] },
+  { day: 5,  items: [{ type: "gold", amount: 300 }, { type: "gems", amount: 25 }] },
+  { day: 6,  items: [{ type: "gold", amount: 400 }, { type: "item", key: "ironscale", amount: 1 }] },
+  { day: 7,  items: [{ type: "gold", amount: 500 }, { type: "gems", amount: 50 }] }
+];
+
+function ensureDailyLogin() {
+  const today = getDateString();
+  if (!save.dailyLogin || save.dailyLogin.date !== today) {
+    const consecutive = save.dailyLogin && save.dailyLogin.date
+      ? (isConsecutiveDay(save.dailyLogin.date, today) ? save.dailyLogin.streak + 1 : 1)
+      : 1;
+    save.dailyLogin = {
+      date: today,
+      streak: consecutive,
+      claimed: false
+    };
+    saveGame();
+  }
+}
+
+function isConsecutiveDay(lastDate, today) {
+  const last = new Date(lastDate);
+  const now = new Date(today);
+  const diff = (now - last) / 86400000;
+  return diff >= 0.9 && diff <= 1.5;
+}
+
+function claimDailyLogin() {
+  ensureDailyLogin();
+  if (save.dailyLogin.claimed) return alert("Daily reward already claimed today.");
+
+  const dayIdx = ((save.dailyLogin.streak - 1) % 7);
+  const reward = DAILY_LOGIN_REWARDS[dayIdx];
+
+  reward.items.forEach(item => {
+    if (item.type === "gold") {
+      save.gold += item.amount;
+    } else if (item.type === "gems") {
+      save.gems += item.amount;
+    } else if (item.type === "item") {
+      if (!save.bag[item.key]) save.bag[item.key] = 0;
+      save.bag[item.key] += item.amount;
+    }
+  });
+
+  save.dailyLogin.claimed = true;
+  saveGame();
+  refreshHome();
+  return { reward, streak: save.dailyLogin.streak };
+}
+
+function initDailyLoginUI() {
+  ensureDailyLogin();
+  const container = document.getElementById("daily-login-content");
+  if (!container) return;
+
+  const today = getDateString();
+  const streak = save.dailyLogin.streak;
+  const claimed = save.dailyLogin.claimed;
+  const dayIndex = ((streak - 1) % 7);
+  const reward = DAILY_LOGIN_REWARDS[dayIndex];
+
+  let html = `<div class="daily-login-header">
+    <div class="login-streak">🔥 Day ${streak} Login Streak</div>
+    <div class="login-date">${today}</div>
+  </div>
+  <div class="login-rewards-row">`;
+
+  DAILY_LOGIN_REWARDS.forEach((r, i) => {
+    const isCurrent = i === dayIndex;
+    const isPast = streak > i + 1 || (streak === i + 1 && claimed);
+    const cls = isCurrent && !claimed ? "login-day current" : isPast ? "login-day past" : "login-day future";
+    const check = isPast ? "✓" : "";
+
+    html += `<div class="${cls}">
+      <div class="login-day-num">Day ${r.day}</div>
+      <div class="login-day-rewards">${r.items.map(it => {
+        if (it.type === "gold") return `🪙${it.amount}`;
+        if (it.type === "gems") return `💎${it.amount}`;
+        if (it.type === "item") return `${ITEMS[it.key] ? ITEMS[it.key].name : it.key}`;
+        return "";
+      }).join("<br>")}</div>
+      <div class="login-check">${check}</div>
+    </div>`;
+  });
+
+  html += `</div>
+    <div class="daily-login-footer">
+      ${!claimed ? `<button class="btn gold" id="btn-claim-daily">Claim Day ${streak} Rewards</button>` : `<button class="btn ghost" disabled>Claimed Today</button>`}
+      <div style="font-size:11px; color:var(--text-dim); margin-top:8px;">${!claimed ? `Claim your Day ${((streak-1)%7)+1} rewards!` : "Come back tomorrow for more!"}</div>
+    </div>`;
+
+  container.innerHTML = html;
+
+  const claimBtn = document.getElementById("btn-claim-daily");
+  if (claimBtn) {
+    claimBtn.onclick = () => {
+      const result = claimDailyLogin();
+      if (result) {
+        const rewardDesc = result.reward.items.map(it => {
+          if (it.type === "gold") return `${formatNum(it.amount)} 🪙`;
+          if (it.type === "gems") return `${formatNum(it.amount)} 💎`;
+          if (it.type === "item") return `${ITEMS[it.key] ? ITEMS[it.key].name : it.key}`;
+          return "";
+        }).join(", ");
+        alert(`🎉 Day ${result.streak} Login Bonus claimed!\n\nReceived: ${rewardDesc}`);
+        initDailyLoginUI();
+      }
+    };
+  }
+}
+
 // --- DAILY QUESTS ---
 const QUEST_POOL = [
   { type: "win_battles", target: 3, desc: "Win 3 Ranked Battles", reward: { gems: 20, gold: 150 } },
@@ -979,4 +1097,117 @@ function initLabUI() {
   };
 
   updateBreedPreview();
+}
+
+// --- GUILD / CLAN SYSTEM ---
+const GUILD_NAMES = [
+  "Rift Wardens", "Ember Legion", "Abyss Stalkers", "Storm Vanguard",
+  "Verdant Circle", "Crystal Sentinels", "Shadow Pact", "Thunder Cohort"
+];
+
+const GUILD_PERKS = {
+  battle: { name: "Battle Boon", desc: "+5% Gold from battles", effect: () => save.gold + Math.floor(save.gold * 0.05) },
+  explore: { name: "Explorer's Grant", desc: "+10% Explore rewards", effect: null },
+  training: { name: "Training Accel", desc: "-20% Dojo training time", effect: null },
+  shop: { name: "Merchant's Discount", desc: "-10% Shop prices", effect: null }
+};
+
+function initGuildUI() {
+  const container = document.getElementById("guild-content");
+  if (!container) return;
+
+  container.innerHTML = "";
+
+  if (save.guild) {
+    showGuildDashboard(container);
+  } else {
+    showGuildCreate(container);
+  }
+}
+
+function showGuildCreate(container) {
+  const createCost = 500;
+  container.innerHTML = `
+    <div class="details-card" style="text-align:center;">
+      <h3>🏰 Guild Hall</h3>
+      <p class="subtitle">Join or create a guild to unlock clan perks and compete together!</p>
+      <div style="margin:16px 0;">
+        <div style="font-size:48px;">🏴</div>
+        <p style="color:var(--text-dim); font-size:13px;">Create a guild for ${formatNum(createCost)} 🪙 and choose your name and perk.</p>
+      </div>
+      <label style="font-size:12px; color:var(--text-dim); display:block; text-align:left;">Guild Name:</label>
+      <select id="guild-name-select" class="btn ghost" style="border:1px solid var(--line); color:white; padding:10px;">
+        ${GUILD_NAMES.map(n => `<option value="${n}">${n}</option>`).join("")}
+      </select>
+      <label style="font-size:12px; color:var(--text-dim); display:block; text-align:left; margin-top:10px;">Guild Perk:</label>
+      <select id="guild-perk-select" class="btn ghost" style="border:1px solid var(--line); color:white; padding:10px;">
+        ${Object.entries(GUILD_PERKS).map(([k, v]) => `<option value="${k}">${v.name} — ${v.desc}</option>`).join("")}
+      </select>
+      <button class="btn gold" id="btn-create-guild" style="margin-top:16px;" ${save.gold < createCost ? 'disabled' : ''}>
+        ${save.gold < createCost ? `Need ${formatNum(createCost)} 🪙` : `Create Guild (${formatNum(createCost)} 🪙)`}
+      </button>
+    </div>
+  `;
+
+  document.getElementById("btn-create-guild").onclick = () => {
+    if (save.gold < createCost) return alert(`Not enough gold. Need ${formatNum(createCost)} 🪙.`);
+    const name = document.getElementById("guild-name-select").value;
+    const perk = document.getElementById("guild-perk-select").value;
+
+    save.gold -= createCost;
+    save.guild = {
+      name: name,
+      perk: perk,
+      level: 1,
+      xp: 0,
+      members: 1,
+      founded: Date.now(),
+      donated: 0
+    };
+    saveGame();
+    refreshHome();
+    initGuildUI();
+    alert(`🏴 Guild "${name}" created!\n\nPerk: ${GUILD_PERKS[perk].name}\n${GUILD_PERKS[perk].desc}`);
+  };
+}
+
+function showGuildDashboard(container) {
+  const g = save.guild;
+  const guildXpNeeded = g.level * 300;
+
+  container.innerHTML = `
+    <div class="details-card" style="text-align:center;">
+      <div style="font-size:40px; margin-bottom:8px;">🏰</div>
+      <h3>${g.name}</h3>
+      <div style="display:flex; justify-content:center; gap:16px; margin:12px 0;">
+        <div style="font-family:var(--mono); font-size:13px; color:var(--text-dim);">Level ${g.level}</div>
+        <div style="font-family:var(--mono); font-size:13px; color:var(--gold);">${GUILD_PERKS[g.perk].name}</div>
+      </div>
+      <div class="xp-bar" style="width:100%; margin:8px 0;"><div class="xp-fill" style="width:${Math.min(100, (g.xp / guildXpNeeded) * 100)}%"></div></div>
+      <div style="font-size:11px; color:var(--text-dim); font-family:var(--mono); margin-bottom:12px;">Guild XP: ${formatNum(g.xp)} / ${formatNum(guildXpNeeded)}</div>
+      <div style="background:var(--card-hi); border-radius:12px; padding:12px; margin:8px 0;">
+        <div style="font-size:12px; color:var(--text-dim);">Guild Perk</div>
+        <div style="font-weight:bold; font-size:14px;">${GUILD_PERKS[g.perk].name}</div>
+        <div style="font-size:11px; color:var(--text-dim);">${GUILD_PERKS[g.perk].desc}</div>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:12px;">
+        <button class="btn ghost" id="btn-guild-donate" style="flex:1;">Donate 100 🪙</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById("btn-guild-donate").onclick = () => {
+    if (save.gold < 100) return alert("Need 100 gold to donate.");
+    save.gold -= 100;
+    save.guild.donated += 100;
+    save.guild.xp += 50;
+    while (save.guild.xp >= guildXpNeeded) {
+      save.guild.xp -= guildXpNeeded;
+      save.guild.level++;
+    }
+    saveGame();
+    refreshHome();
+    initGuildUI();
+    alert(`Donated 100 🪙 to the guild! Guild gained 50 XP.`);
+  };
 }
