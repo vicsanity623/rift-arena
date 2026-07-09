@@ -603,6 +603,7 @@ document.getElementById("btn-survival-team").addEventListener("click", ()=>{
 
 document.getElementById("btn-tournament-team").addEventListener("click", ()=>{
   if(pickOrder.length !== 3) return;
+  if (save.gems < 50) return alert(`Not enough Gems! Need 50 💎 for tournament entry.`);
   startTournamentMode(pickOrder.slice());
 });
 
