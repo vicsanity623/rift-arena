@@ -77,6 +77,11 @@
         <div class="label">Shop</div>
         <div class="desc">Buy Items</div>
       </div>
+      <div class="dash-card" id="card-daily-login">
+        <div class="icon-bg">🎁</div>
+        <div class="label">Login Bonus</div>
+        <div class="desc" id="daily-login-dash">Claim</div>
+      </div>
       <div class="dash-card" id="card-dojo">
         <div class="icon-bg">🥋</div>
         <div class="label">Dojo</div>
@@ -101,6 +106,11 @@
         <div class="icon-bg">🧬</div>
         <div class="label">Breeding Lab</div>
         <div class="desc">Create Variants</div>
+      </div>
+      <div class="dash-card" id="card-guild">
+        <div class="icon-bg">🏰</div>
+        <div class="label">Guild</div>
+        <div class="desc" id="guild-dash">Create</div>
       </div>
     </div>
   </section>
@@ -264,6 +274,18 @@
       <button class="btn ghost" data-back="screen-home">Home</button>
       <button class="btn gold" id="btn-rematch">Battle Again</button>
     </div>
+  </section>
+
+  <!-- DAILY LOGIN -->
+  <section class="screen" id="screen-daily-login">
+    <div class="backrow"><button class="iconbtn" data-back="screen-home">←</button><h2>Daily Login</h2></div>
+    <div id="daily-login-content" style="flex:1; display:flex; flex-direction:column; gap:16px;"></div>
+  </section>
+
+  <!-- GUILD -->
+  <section class="screen" id="screen-guild">
+    <div class="backrow"><button class="iconbtn" data-back="screen-home">←</button><h2>Guild Hall</h2></div>
+    <div id="guild-content" style="flex:1; display:flex; flex-direction:column; gap:16px;"></div>
   </section>
 
 </div>
