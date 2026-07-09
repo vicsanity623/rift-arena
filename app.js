@@ -36,27 +36,27 @@ const ROSTER_DEF = [
 ];
 
 const VARIANTS = {
-  shadow: { name:"Shadow", icon:"🌑", desc:"Dark-infused, high ATK+SPD",statMods:{atk:1.25,spd:1.15,def:0.85,hp:0.9} },
-  crystal: { name:"Crystal", icon:"💎", desc:"Hardened, high DEF+HP",statMods:{def:1.25,hp:1.15,atk:0.85,spd:0.9} },
-  primal: { name:"Primal", icon:"⚡", desc:"Ancient power, all stats up",statMods:{atk:1.15,def:1.15,spd:1.15,hp:1.15} },
-  toxic: { name:"Toxic", icon:"☠️", desc:"Poison-infused, high SPD+ATK",statMods:{spd:1.25,atk:1.15,def:0.9,hp:0.95} }
+  shadow: { name: "Shadow", icon: "🌑", desc: "Dark-infused, high ATK+SPD", statMods: { atk: 1.25, spd: 1.15, def: 0.85, hp: 0.9 } },
+  crystal: { name: "Crystal", icon: "💎", desc: "Hardened, high DEF+HP", statMods: { def: 1.25, hp: 1.15, atk: 0.85, spd: 0.9 } },
+  primal: { name: "Primal", icon: "⚡", desc: "Ancient power, all stats up", statMods: { atk: 1.15, def: 1.15, spd: 1.15, hp: 1.15 } },
+  toxic: { name: "Toxic", icon: "☠️", desc: "Poison-infused, high SPD+ATK", statMods: { spd: 1.25, atk: 1.15, def: 0.9, hp: 0.95 } }
 };
 
 const NPC_LEADERBOARD = [
-  { name:"Nightshard", vp:5200, rank:"Master", wins:342, losses:98, badge:"👑" },
-  { name:"Kestrix", vp:4800, rank:"Master", wins:289, losses:112, badge:"👑" },
-  { name:"Voltara", vp:4300, rank:"Platinum", wins:256, losses:134, badge:"🥇" },
-  { name:"Glacius", vp:4100, rank:"Platinum", wins:198, losses:87, badge:"🥇" },
-  { name:"Tecton", vp:3800, rank:"Platinum", wins:175, losses:102, badge:"🥈" },
-  { name:"Sylvara", vp:3600, rank:"Gold", wins:201, losses:145, badge:"🥈" },
-  { name:"Blitzara", vp:3400, rank:"Gold", wins:167, losses:123, badge:"🥈" },
-  { name:"Fernwood", vp:3100, rank:"Gold", wins:154, losses:119, badge:"🥉" },
-  { name:"Rowan", vp:2800, rank:"Silver", wins:132, losses:98, badge:"🥉" },
-  { name:"Ashvale", vp:2500, rank:"Silver", wins:118, losses:87, badge:"🥉" },
-  { name:"Epidemic", vp:2100, rank:"Silver", wins:89, losses:76, badge:"" },
-  { name:"Diremire", vp:1800, rank:"Bronze", wins:67, losses:54, badge:"" },
-  { name:"Shadoom", vp:1500, rank:"Bronze", wins:45, losses:38, badge:"" },
-  { name:"Vellum", vp:1200, rank:"Bronze", wins:32, losses:41, badge:"" },
+  { name: "Nightshard", vp: 5200, rank: "Master", wins: 342, losses: 98, badge: "👑" },
+  { name: "Kestrix", vp: 4800, rank: "Master", wins: 289, losses: 112, badge: "👑" },
+  { name: "Voltara", vp: 4300, rank: "Platinum", wins: 256, losses: 134, badge: "🥇" },
+  { name: "Glacius", vp: 4100, rank: "Platinum", wins: 198, losses: 87, badge: "🥇" },
+  { name: "Tecton", vp: 3800, rank: "Platinum", wins: 175, losses: 102, badge: "🥈" },
+  { name: "Sylvara", vp: 3600, rank: "Gold", wins: 201, losses: 145, badge: "🥈" },
+  { name: "Blitzara", vp: 3400, rank: "Gold", wins: 167, losses: 123, badge: "🥈" },
+  { name: "Fernwood", vp: 3100, rank: "Gold", wins: 154, losses: 119, badge: "🥉" },
+  { name: "Rowan", vp: 2800, rank: "Silver", wins: 132, losses: 98, badge: "🥉" },
+  { name: "Ashvale", vp: 2500, rank: "Silver", wins: 118, losses: 87, badge: "🥉" },
+  { name: "Epidemic", vp: 2100, rank: "Silver", wins: 89, losses: 76, badge: "" },
+  { name: "Diremire", vp: 1800, rank: "Bronze", wins: 67, losses: 54, badge: "" },
+  { name: "Shadoom", vp: 1500, rank: "Bronze", wins: 45, losses: 38, badge: "" },
+  { name: "Vellum", vp: 1200, rank: "Bronze", wins: 32, losses: 41, badge: "" },
 ];
 
 const TYPE_CHART = {
@@ -340,7 +340,7 @@ function getMonData(uid) {
 
   const variantKey = mSave.variant || null;
   const variantDef = variantKey ? VARIANTS[variantKey] : null;
-  const vMod = variantDef ? variantDef.statMods : { hp:1, atk:1, def:1, spd:1 };
+  const vMod = variantDef ? variantDef.statMods : { hp: 1, atk: 1, def: 1, spd: 1 };
 
   const evoLevel = def[10] || 0;
   const evoName = def[11] || "";
@@ -376,7 +376,7 @@ function initLeaderboardUI() {
   const container = document.getElementById("leaderboard-content");
   container.innerHTML = "";
 
-  const sorted = [...NPC_LEADERBOARD].sort((a,b) => b.vp - a.vp);
+  const sorted = [...NPC_LEADERBOARD].sort((a, b) => b.vp - a.vp);
   let playerIdx = -1;
   for (let i = 0; i < sorted.length; i++) {
     if (save.vp > sorted[i].vp) { playerIdx = i; break; }
@@ -399,7 +399,7 @@ function initLeaderboardUI() {
     const isPlayerPos = i === playerIdx;
     html += `<div class="lb-row ${isPlayerPos ? 'lb-row-you' : ''}">
       <div class="lb-rank">${i < 3 ? npc.badge : "#" + (i + 1)}</div>
-      <div class="lb-orb t-${["ember","aqua","verdant","volt","stone","gale"][i % 6]}"><div class="glyph"></div></div>
+      <div class="lb-orb t-${["ember", "aqua", "verdant", "volt", "stone", "gale"][i % 6]}"><div class="glyph"></div></div>
       <div class="lb-info">
         <div class="lb-npc-name">${npc.name}</div>
         <div class="lb-npc-stats">${npc.rank} · ${npc.wins}W ${npc.losses}L</div>
@@ -409,7 +409,7 @@ function initLeaderboardUI() {
     if (isPlayerPos) {
       html += `<div class="lb-row lb-row-player">
         <div class="lb-rank">#${playerIdx + 1}</div>
-        <div class="lb-orb t-${["ember","aqua","verdant","volt","stone","gale"][playerIdx % 6]}"><div class="glyph"></div></div>
+        <div class="lb-orb t-${["ember", "aqua", "verdant", "volt", "stone", "gale"][playerIdx % 6]}"><div class="glyph"></div></div>
         <div class="lb-info">
           <div class="lb-npc-name">You (${rankForVP(save.vp)})</div>
           <div class="lb-npc-stats">${fmt(save.vp)} VP</div>
