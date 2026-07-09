@@ -11,3 +11,4 @@
 [DAY 8] | 2026-07-08 | Training Dojo (Light/Medium/Intense training for XP+Gold), Multi-Wave Survival Mode (escalating difficulty, retreat/cash-out mechanic). | NEXT: Add monster evolution system and implement in-game shop/store.
 [DAY 9] | 2026-07-08 | Monster evolution system (Lv.15/Lv.20 evolution with stat boosts, new names), in-game shop/store (daily rotating stock, free daily item, 7 item types). | NEXT: Add PvP matchmaking system and implement tournament mode.
 [DAY 10] | 2026-07-08 | PvP matchmaking system (VP-based queue, animated searching, ranked opponents) and tournament mode (4-player bracket, entry fee, prize pool). | NEXT: Add PvP leaderboard rankings and implement monster variant/breed system.
+[DAY 11] | 2026-07-09 | PvP leaderboard rankings (NPC ladder, player position, match history) and monster variant/breed system (4 variant types with stat mods, 10% summon chance, breeding lab). | NEXT: Add guild/clan system and implement daily login rewards.
