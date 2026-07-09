@@ -734,7 +734,7 @@ document.getElementById("btn-tourney-leave").addEventListener("click", () => {
 });
 
 /* ============================= TOURNAMENT MODE ============================= */
-let tournamentState = null;
+var tournamentState = null;
 
 function startTournamentMode(playerUids) {
   const entryFee = 50;
