@@ -347,8 +347,8 @@ function refreshHome(){
   
   document.getElementById("home-rank").textContent = rankForVP(save.vp);
   document.getElementById("home-vp").textContent = formatNum(save.vp) + " VP";
-  updateExploreDash();
-  updateDojoDash();
+  if (typeof updateExploreDash === "function") updateExploreDash();
+  if (typeof updateDojoDash === "function") updateDojoDash();
 }
 
 setInterval(() => {
@@ -377,7 +377,7 @@ document.getElementById("card-summon").addEventListener("click", () => {
   const uid = Date.now().toString() + Math.floor(Math.random()*1000);
   save.mons.push({ uid: uid, baseId: choice[0], level: 1, xp: 0, heldItem: "none", mergeBonuses: {}, onExpedition: false, evolved: false });
   
-  trackQuestProgress("summon", 1);
+  if (typeof trackQuestProgress === "function") trackQuestProgress("summon", 1);
   saveGame(); refreshHome();
   alert(`✨ Summoned a new ${choice[1]}! Added to roster.`);
 });
@@ -386,12 +386,27 @@ document.getElementById("card-summon").addEventListener("click", () => {
 document.getElementById("card-explore").addEventListener("click", ()=>{ initExploreUI(); show("screen-explore"); });
 document.getElementById("card-merge").addEventListener("click", ()=>{ initMergeUI(); show("screen-merge"); });
 document.getElementById("card-bag").addEventListener("click", ()=>{ initBagUI(); show("screen-bag"); });
-document.getElementById("card-shop").addEventListener("click", ()=>{ initShopUI(); show("screen-shop"); });
-document.getElementById("card-dojo").addEventListener("click", ()=>{ initDojoUI(); show("screen-dojo"); });
+if(document.getElementById("card-shop")) document.getElementById("card-shop").addEventListener("click", ()=>{ initShopUI(); show("screen-shop"); });
+if(document.getElementById("card-dojo")) document.getElementById("card-dojo").addEventListener("click", ()=>{ initDojoUI(); show("screen-dojo"); });
 
-document.getElementById("card-battle").addEventListener("click", ()=>{ buildSelectGrid(); show("screen-select"); });
+document.getElementById("card-battle").addEventListener("click", ()=>{
+  if (save.mons.filter(m => !m.onExpedition).length < 3) return alert("You need at least 3 Rift-forms available to battle.");
+  buildSelectGrid(); 
+  show("screen-select"); 
+  document.getElementById("btn-confirm-team").textContent = "Find Ranked Match";
+  if(document.getElementById("btn-survival-team")) document.getElementById("btn-survival-team").style.display = "";
+  if(document.getElementById("btn-tournament-team")) document.getElementById("btn-tournament-team").style.display = "";
+});
+document.getElementById("card-battle").addEventListener("contextmenu", (e)=>{
+  e.preventDefault();
+  buildSelectGrid();
+  show("screen-select");
+  document.getElementById("btn-confirm-team").textContent = "Find Ranked Match";
+  if(document.getElementById("btn-survival-team")) document.getElementById("btn-survival-team").style.display = "";
+  if(document.getElementById("btn-tournament-team")) document.getElementById("btn-tournament-team").style.display = "";
+});
 document.getElementById("card-roster").addEventListener("click", ()=>{ buildRosterView(); show("screen-roster"); });
-document.getElementById("card-quests").addEventListener("click", ()=>{ initQuestsUI(); show("screen-quests"); });
+if(document.getElementById("card-quests")) document.getElementById("card-quests").addEventListener("click", ()=>{ initQuestsUI(); show("screen-quests"); });
 refreshHome();
 
 /* ============================= ROSTER & DETAILS ============================= */
@@ -456,7 +471,7 @@ function showMonDetails(m) {
     if (save.gold < upgCost) return alert("Not enough gold.");
     save.gold -= upgCost;
     save.mons.find(x => x.uid === m.uid).level++;
-    trackQuestProgress("level_up", 1);
+    if (typeof trackQuestProgress === "function") trackQuestProgress("level_up", 1);
     saveGame(); refreshHome(); showMonDetails(getMonData(m.uid));
   };
 
@@ -516,26 +531,158 @@ function togglePick(uid, card){
 
 function updateConfirmBtn(){
   const btn = document.getElementById("btn-confirm-team");
-  btn.textContent = `Confirm Team (${pickOrder.length}/3)`;
+  btn.textContent = `Find Ranked Match (${pickOrder.length}/3)`;
   btn.disabled = pickOrder.length !== 3;
   const survBtn = document.getElementById("btn-survival-team");
-  survBtn.textContent = `Survival Mode (${pickOrder.length}/3)`;
-  survBtn.disabled = pickOrder.length !== 3;
+  if(survBtn) {
+    survBtn.textContent = `Survival Mode (${pickOrder.length}/3)`;
+    survBtn.disabled = pickOrder.length !== 3;
+  }
+  const tourneyBtn = document.getElementById("btn-tournament-team");
+  if (tourneyBtn) {
+    tourneyBtn.textContent = `Tournament (${pickOrder.length}/3)`;
+    tourneyBtn.disabled = pickOrder.length !== 3;
+  }
 }
 
 document.getElementById("btn-confirm-team").addEventListener("click", ()=>{
   if(pickOrder.length !== 3) return;
-  startPrep(pickOrder.slice());
+  startMatchmaking(pickOrder.slice());
 });
 
-document.getElementById("btn-survival-team").addEventListener("click", ()=>{
-  if(pickOrder.length !== 3) return;
-  startSurvivalMode();
+if(document.getElementById("btn-survival-team")) {
+  document.getElementById("btn-survival-team").addEventListener("click", ()=>{
+    if(pickOrder.length !== 3) return;
+    if (typeof startSurvivalMode === "function") startSurvivalMode();
+  });
+}
+
+if(document.getElementById("btn-tournament-team")) {
+  document.getElementById("btn-tournament-team").addEventListener("click", ()=>{
+    if(pickOrder.length !== 3) return;
+    if (typeof startTournamentMode === "function") startTournamentMode(pickOrder.slice());
+  });
+}
+
+/* ============================= MATCHMAKING QUEUE ============================= */
+let matchmakingTimer = null;
+
+function startMatchmaking(playerUids) {
+  const pData = playerUids.map(uid => getMonData(uid));
+  const avgLevel = Math.max(1, Math.floor(pData.reduce((s, m) => s + m.level, 0) / 3));
+  const playerVP = save.vp;
+
+  if(!document.getElementById("queue-timer")) {
+      // Fallback if UI doesn't have queue screen, just instantly match
+      startPrepDirect(playerUids, avgLevel, playerVP);
+      return;
+  }
+
+  document.getElementById("queue-timer").textContent = "00:00";
+  document.getElementById("queue-sub").textContent = "Searching the arena for a worthy opponent...";
+  document.getElementById("queue-rank-range").textContent = `Your VP: ${formatNum(playerVP)}`;
+  show("screen-queue");
+
+  const queueStart = Date.now();
+  const searchTime = 3000 + Math.random() * 4000;
+
+  clearInterval(matchmakingTimer);
+  matchmakingTimer = setInterval(() => {
+    const elapsed = Math.floor((Date.now() - queueStart) / 1000);
+    const m = Math.floor(elapsed / 60);
+    const s = elapsed % 60;
+    document.getElementById("queue-timer").textContent = String(m).padStart(2,"0") + ":" + String(s).padStart(2,"0");
+
+    if (elapsed % 3 === 0) {
+      const msgs = [
+        "Scanning nearby rift signatures...",
+        "Evaluating opponent ranking...",
+        "Checking arena availability...",
+        "Calibrating match balance...",
+        "Opponent found! Authenticating...",
+        "Establishing rift connection..."
+      ];
+      document.getElementById("queue-sub").textContent = msgs[Math.floor(Math.random() * msgs.length)];
+    }
+  }, 1000);
+
+  setTimeout(() => {
+    clearInterval(matchmakingTimer);
+    document.getElementById("queue-sub").textContent = "Match found!";
+    startPrepDirect(playerUids, avgLevel, playerVP);
+  }, searchTime);
+}
+
+function startPrepDirect(playerUids, avgLevel, playerVP) {
+    // Build opponent based on VP matchmaking
+    const vpDiff = Math.floor((Math.random() - 0.5) * 400);
+    const oppVP = Math.max(500, playerVP + vpDiff);
+    const oppRank = rankForVP(oppVP);
+    const oppLvl = Math.max(1, avgLevel + Math.floor((oppVP - playerVP) / 200));
+
+    const trainer = TRAINER_TEMPLATES[Math.floor(Math.random() * TRAINER_TEMPLATES.length)];
+    let oppIds;
+    if (trainer.theme) {
+      const themes = trainer.theme.includes("+") ? trainer.theme.split("+") : [trainer.theme];
+      let pool = [];
+      themes.forEach(t => { if (THEMED_ROSTER[t]) pool = pool.concat(THEMED_ROSTER[t]); });
+      pool = [...new Set(pool)].sort(() => Math.random() - 0.5);
+      const fromTheme = [...pool];
+      while (fromTheme.length < 3) {
+        const extra = ROSTER_DEF.map(r=>r[0]).sort(()=>Math.random()-0.5).filter(id => !fromTheme.includes(id));
+        fromTheme.push(extra[0]);
+      }
+      oppIds = fromTheme;
+    } else {
+      oppIds = ROSTER_DEF.map(r=>r[0]).sort(()=>Math.random()-0.5).slice(0, 3);
+    }
+
+    if(document.getElementById("prep-foe-name")) document.getElementById("prep-foe-name").textContent = trainer.name;
+    
+    // Call the original prep function, or route to a custom if startPrepWithData exists
+    if (typeof startPrepWithData === "function") {
+        startPrepWithData(playerUids, oppIds, oppLvl, trainer, oppRank);
+    } else {
+        // Safe fallback logic inline
+        battle = {
+            player: playerUids.map(uid => {
+                let m = getMonData(uid);
+                m.effDef = Math.round(m.def * (m.item === "ironscale" ? 1.15 : 1));
+                m.hp = m.baseHp; m.itemUsed = false; m.fainted = false;
+                m.statusEffects = []; m.statusAtkMult = 1; m.statusSkipTurns = 0;
+                return m;
+            }),
+            foe: oppIds.map(id => instantiateFoe(id, oppLvl)),
+            pIndex: 0, fIndex: 0,
+            opponentName: trainer.name,
+            personality: trainer.personality,
+            over: false
+        };
+        const weatherKeys = Object.keys(WEATHER_CONDITIONS).filter(k => k !== "none");
+        if (Math.random() < 0.30) {
+            setWeather(weatherKeys[Math.floor(Math.random() * weatherKeys.length)], 3 + Math.floor(Math.random() * 3));
+        } else {
+            setWeather("none", 0);
+        }
+
+        document.getElementById("prep-player-slots").innerHTML = ""; document.getElementById("prep-foe-slots").innerHTML = "";
+        battle.player.forEach((m,i)=> document.getElementById("prep-player-slots").insertAdjacentHTML("beforeend", `<div class="prep-slot ${i===0?'lead':''}"><div class="n">${i+1}</div><div class="nm">${m.name}</div></div>`));
+        battle.foe.forEach((m,i)=> document.getElementById("prep-foe-slots").insertAdjacentHTML("beforeend", `<div class="prep-slot ${i===0?'lead':''} hidden"><div class="n">${i+1}</div><div class="nm">???</div></div>`));
+        show("screen-prep"); runPrepTimer();
+    }
+}
+
+if(document.getElementById("btn-cancel-queue")) document.getElementById("btn-cancel-queue").addEventListener("click", () => {
+  clearInterval(matchmakingTimer);
+  buildSelectGrid();
+  show("screen-select");
 });
 
-/* ============================= BATTLE SYSTEM ============================= */
+/* ============================= BATTLE SYSTEM (ASYNC RESOLUTION) ============================= */
 let battle = null;
 let awaitingInput = true;
+
+const delay = ms => new Promise(res => setTimeout(res, ms));
 
 function instantiateFoe(baseId, lvl) {
   const def = ROSTER_DEF.find(r => r[0] === baseId);
@@ -553,74 +700,13 @@ function instantiateFoe(baseId, lvl) {
   return m;
 }
 
-function startPrep(playerUids){
-  awaitingInput = true; 
-  const pData = playerUids.map(uid => getMonData(uid));
-  const avgPLevel = Math.max(1, Math.floor(pData.reduce((sum, m) => sum + m.level, 0) / 3));
-  
-  // AI Level scales with Tier but caps relative to player
-  const aiLvl = Math.max(1, avgPLevel + Math.floor((save.tierLevel - 1) * 0.5));
-
-  // Pick trainer template with possible themed roster
-  const trainer = TRAINER_TEMPLATES[Math.floor(Math.random() * TRAINER_TEMPLATES.length)];
-  let oppIds;
-  if (trainer.theme) {
-    // Support dual-type themes like "aqua+gale"
-    const themes = trainer.theme.includes("+") ? trainer.theme.split("+") : [trainer.theme];
-    let pool = [];
-    themes.forEach(t => {
-      if (THEMED_ROSTER[t]) pool = pool.concat(THEMED_ROSTER[t]);
-    });
-    // Deduplicate
-    pool = [...new Set(pool)].sort(() => Math.random() - 0.5);
-    // Fill remaining slots from general pool if theme pool < 3
-    const fromTheme = [...pool];
-    while (fromTheme.length < 3) {
-      const extra = ROSTER_DEF.map(r=>r[0]).sort(()=>Math.random()-0.5).filter(id => !fromTheme.includes(id));
-      fromTheme.push(extra[0]);
-    }
-    oppIds = fromTheme;
-  } else {
-    const oppPool = ROSTER_DEF.map(r=>r[0]);
-    oppIds = oppPool.sort(()=>Math.random()-0.5).slice(0,3);
-  }
-
-  battle = {
-    player: pData.map(m => {
-      m.effDef = Math.round(m.def * (m.item === "ironscale" ? 1.15 : 1));
-      m.hp = m.baseHp; m.itemUsed = false; m.fainted = false;
-      m.statusEffects = []; m.statusAtkMult = 1; m.statusSkipTurns = 0;
-      return m;
-    }),
-    foe: oppIds.map(id => instantiateFoe(id, aiLvl)),
-    pIndex: 0, fIndex: 0,
-    opponentName: trainer.name,
-    personality: trainer.personality,
-    over: false
-  };
-
-  // Random weather at battle start (30% chance, lasts 3-5 turns)
-  const weatherKeys = Object.keys(WEATHER_CONDITIONS).filter(k => k !== "none");
-  if (Math.random() < 0.30) {
-    const wType = weatherKeys[Math.floor(Math.random() * weatherKeys.length)];
-    setWeather(wType, 3 + Math.floor(Math.random() * 3));
-  } else {
-    setWeather("none", 0);
-  }
-
-  document.getElementById("prep-player-slots").innerHTML = ""; document.getElementById("prep-foe-slots").innerHTML = "";
-  battle.player.forEach((m,i)=> document.getElementById("prep-player-slots").insertAdjacentHTML("beforeend", `<div class="prep-slot ${i===0?'lead':''}"><div class="n">${i+1}</div><div class="nm">${m.name}</div></div>`));
-  battle.foe.forEach((m,i)=> document.getElementById("prep-foe-slots").insertAdjacentHTML("beforeend", `<div class="prep-slot ${i===0?'lead':''} hidden"><div class="n">${i+1}</div><div class="nm">???</div></div>`));
-  document.getElementById("prep-foe-name").textContent = battle.opponentName;
-  show("screen-prep"); runPrepTimer();
-}
-
 let prepTimerHandle = null;
 function runPrepTimer(){
+  awaitingInput = true;
   let t = 4; document.getElementById("prep-clock").textContent = "00:04"; clearInterval(prepTimerHandle);
   prepTimerHandle = setInterval(()=>{ t--; if(t<=0){ clearInterval(prepTimerHandle); revealFoeAndBattle(); return; } document.getElementById("prep-clock").textContent = "00:0" + t; }, 1000);
 }
-document.getElementById("btn-skip-prep").onclick = ()=> { clearInterval(prepTimerHandle); revealFoeAndBattle(); };
+if(document.getElementById("btn-skip-prep")) document.getElementById("btn-skip-prep").onclick = ()=> { clearInterval(prepTimerHandle); revealFoeAndBattle(); };
 
 function revealFoeAndBattle(){
   document.querySelectorAll("#prep-foe-slots .prep-slot").forEach((el,i)=>{ el.classList.remove("hidden"); el.querySelector(".nm").textContent = battle.foe[i].name; });
@@ -637,23 +723,26 @@ function renderBattle(fullRebuild){
   document.getElementById("ally-hp").style.width = Math.max(0,(p.hp/p.baseHp*100)) + "%";
   document.getElementById("foe-hp").style.width = Math.max(0,(f.hp/f.baseHp*100)) + "%";
 
-  // Weather indicator
-  const wEl = document.getElementById("weather-display");
+  let wEl = document.getElementById("weather-display");
+  if(!wEl) {
+    wEl = document.createElement("div"); wEl.id = "weather-display";
+    wEl.style = "position:absolute; top:10px; right:10px; background:rgba(0,0,0,0.5); padding:4px 8px; border-radius:8px; font-size:12px; z-index:10;";
+    document.getElementById("arena").appendChild(wEl);
+  }
+  
   if (weather && weather.type !== "none") {
     const w = WEATHER_CONDITIONS[weather.type];
     wEl.textContent = `${w.icon} ${w.name} (${weather.turnsLeft}t)`;
-    wEl.style.display = "flex";
+    wEl.style.display = "block";
   } else {
     wEl.style.display = "none";
   }
 
-  // Status indicators
   const pStatusEl = document.getElementById("ally-status");
   const fStatusEl = document.getElementById("foe-status");
   if (pStatusEl) pStatusEl.innerHTML = (p.statusEffects||[]).map(k => `<span style="color:${STATUS_EFFECTS[k].color}">${STATUS_EFFECTS[k].icon}</span>`).join(" ");
   if (fStatusEl) fStatusEl.innerHTML = (f.statusEffects||[]).map(k => `<span style="color:${STATUS_EFFECTS[k].color}">${STATUS_EFFECTS[k].icon}</span>`).join(" ");
 
-  // Status CSS on mon sprites
   const pm = document.getElementById("player-mon"); pm.className = "mon " + p.shape + " t-" + p.type;
   const fm = document.getElementById("foe-mon"); fm.className = "mon " + f.shape + " t-" + f.type;
   (p.statusEffects||[]).forEach(k => pm.classList.add(k === "freeze" ? "frozen" : k));
@@ -697,34 +786,25 @@ function aiPickAction() {
   const personality = AI_PERSONALITIES[battle.personality] || AI_PERSONALITIES.balanced;
   const aliveFoes = battle.foe.filter(m => !m.fainted);
   
-  // Evaluate type disadvantage: does player have a super effective move against current AI mon?
   const bestPlyrMove = p.moves.reduce((best, mv) => {
     const s = mv.power * typeMultiplier(mv.type, f.type);
     return s > (best?.score || -1) ? {mv, score: s} : best;
   }, null);
   const aiAtDisadvantage = bestPlyrMove && bestPlyrMove.score > 80;
   
-  // Smart switch: pick the mon with best type resistance to player's current mon
   if (aliveFoes.length > 1 && aiAtDisadvantage && (f.hp / f.baseHp) <= personality.switchBelowHpPct && Math.random() < personality.switchChance) {
     let bestSwitch = null, bestResist = -1;
     aliveFoes.forEach(candidate => {
       if (candidate.uid === f.uid) return;
       let totalDmg = 0;
-      p.moves.forEach(mv => {
-        const mult = typeMultiplier(mv.type, candidate.type);
-        totalDmg += mv.power * mult;
-      });
+      p.moves.forEach(mv => { totalDmg += mv.power * typeMultiplier(mv.type, candidate.type); });
       const avgMult = totalDmg / (p.moves.length * 100);
       const resistScore = 1 - avgMult;
       if (resistScore > bestResist) { bestResist = resistScore; bestSwitch = candidate; }
     });
-    if (bestSwitch) {
-      battle.fIndex = battle.foe.indexOf(bestSwitch);
-      return {kind:"switch", index: battle.fIndex};
-    }
+    if (bestSwitch) return {kind:"switch", index: battle.foe.indexOf(bestSwitch)};
   }
   
-  // Pick best move considering personality, weather, and status
   let best = null, bScore = -1;
   f.moves.forEach(mv => {
     const mult = typeMultiplier(mv.type, p.type);
@@ -740,25 +820,55 @@ function aiPickAction() {
 }
 
 function playerAct(action){
-  if(!awaitingInput || battle.over) return; awaitingInput = false;
+  if(!awaitingInput || battle.over) return; 
+  awaitingInput = false;
   document.getElementById("action-panel").innerHTML = "";
   const aiAct = aiPickAction();
   resolveTurn(action, aiAct);
 }
 
-function resolveTurn(pAct, aiAct){
-  const logLines = []; let pActs = true, aiActs = true;
-  if(pAct.kind === "switch"){ battle.pIndex = pAct.index; logLines.push(`You send out <b>${activePlayer().name}</b>!`); pActs = false; }
-  if(aiAct.kind === "switch"){ battle.fIndex = aiAct.index; logLines.push(`${battle.opponentName} sends out <b>${activeFoe().name}</b>!`); aiActs = false; }
+async function resolveTurn(pAct, aiAct) {
+  const logLines = []; 
+  let pActs = true, aiActs = true;
+
+  // Real-time UI log updater
+  const updateLog = () => {
+    const logEl = document.getElementById("battle-log");
+    logEl.innerHTML = logLines.join("<br>");
+    logEl.scrollTop = logEl.scrollHeight;
+  };
+
+  // Phase 1: Handling Switches Instantly
+  if(pAct.kind === "switch"){ 
+    battle.pIndex = pAct.index; 
+    logLines.push(`You send out <b>${activePlayer().name}</b>!`); 
+    pActs = false; 
+    updateLog();
+    await delay(1000); 
+  }
+  
+  if(aiAct.kind === "switch"){ 
+    battle.fIndex = aiAct.index; 
+    logLines.push(`${battle.opponentName} sends out <b>${activeFoe().name}</b>!`); 
+    aiActs = false; 
+    updateLog();
+    await delay(1000); 
+  }
+  
+  // Setup order
   const order = [];
   if(pActs && aiActs) order.push(...(activePlayer().spd >= activeFoe().spd ? ["p","f"] : ["f","p"]));
   else if(aiActs) order.push("f");
   else if(pActs) order.push("p");
   
-  function doMove(side){
-    if(battle.over) return;
-    const atk = side==="p"? activePlayer():activeFoe(), def = side==="p"? activeFoe():activePlayer();
-    if(atk.fainted || def.fainted) return;
+  // Phase 2: Execute attacks in order WITH delay
+  for (let i = 0; i < order.length; i++) {
+    if (battle.over) break;
+    const side = order[i];
+    const atk = side === "p" ? activePlayer() : activeFoe();
+    const def = side === "p" ? activeFoe() : activePlayer();
+    
+    if(atk.fainted || def.fainted) continue;
 
     // Freeze check
     if (atk.statusSkipTurns > 0) {
@@ -766,24 +876,43 @@ function resolveTurn(pAct, aiAct){
       atk.statusSkipTurns--;
       if (atk.statusSkipTurns <= 0) cureStatus(atk);
       renderBattle(false);
-      return;
+      updateLog();
+      if (i < order.length - 1) await delay(1800);
+      continue;
     }
 
-    // Burn damage before attacking
+    // Burn damage
     if (atk.statusEffects && atk.statusEffects.includes("burn") && !atk.fainted) {
       const tick = resolveStatusTick(atk);
       if (tick && tick !== "skip") {
         logLines.push(`${atk.name} took ${tick} burn damage.`);
-        if (atk.hp <= 0) { atk.fainted = true; logLines.push(`<b>${atk.name} fainted from burn!</b>`); renderBattle(false); return; }
+        if (atk.hp <= 0) { 
+            atk.fainted = true; 
+            logLines.push(`<b>${atk.name} fainted from burn!</b>`); 
+            renderBattle(false); 
+            updateLog();
+            break; 
+        }
       }
     }
 
-    const mv = side==="p"? pAct.move : aiAct.move;
+    const mv = side==="p" ? pAct.move : aiAct.move;
     
-    if(mv.type !== "neutral" && Math.random()*100 > mv.acc) { logLines.push(`${atk.name} missed!`); return; }
+    if(mv.type !== "neutral" && Math.random()*100 > mv.acc) { 
+        logLines.push(`${atk.name} used ${mv.name} but missed!`); 
+        updateLog();
+        if (i < order.length - 1) await delay(1800);
+        continue; 
+    }
+    
     const mult = typeMultiplier(mv.type, def.type);
     const weatherMult = getWeatherMult(mv.type, def.type);
-    if(mult === 0) { logLines.push(`${atk.name}'s move had no effect.`); return; }
+    if(mult === 0) { 
+        logLines.push(`${atk.name}'s ${mv.name} had no effect on ${def.name}.`); 
+        updateLog();
+        if (i < order.length - 1) await delay(1800);
+        continue; 
+    }
     
     const isCrit = Math.random() < 0.08;
     const atkMult = (atk.statusAtkMult || 1);
@@ -792,7 +921,6 @@ function resolveTurn(pAct, aiAct){
     if(def.item === "guardcharm") raw *= 0.9;
     let dmg = Math.max(1, Math.round(raw));
     
-    // Play hit sound
     if (isCrit) playCritSound(); else playHitSound(mv.type === "stone" ? 100 : mv.type === "gale" ? 200 : 150);
     
     const atkEl = document.getElementById(side==="p"?"player-mon":"foe-mon");
@@ -807,7 +935,6 @@ function resolveTurn(pAct, aiAct){
     if(weatherMult !== 1) dmgLog += weatherMult > 1 ? " <span style='color:var(--warn)'>Weather boosted!</span>" : " <span style='color:var(--text-dim)'>Weather dampened...</span>";
     logLines.push(dmgLog);
 
-    // 20% chance to apply status effect based on move type
     if (!def.statusEffects || def.statusEffects.length === 0) {
       const statusChance = { ember:0.2, aqua:0.2, verdant:0, volt:0.2, stone:0, gale:0 };
       const statusMap = { ember:"burn", aqua:"freeze", volt:"burn", gale:"freeze" };
@@ -820,7 +947,6 @@ function resolveTurn(pAct, aiAct){
     const defEl = document.getElementById(side==="p"?"foe-mon":"player-mon");
     defEl.classList.remove("hit"); void defEl.offsetWidth; defEl.classList.add(isCrit ? "crit-hit" : "hit");
     
-    // Screen shake + damage float
     const arena = document.getElementById("arena");
     arena.classList.remove("shake"); void arena.offsetWidth; arena.classList.add("shake");
     
@@ -833,7 +959,6 @@ function resolveTurn(pAct, aiAct){
     arena.appendChild(dmgFloat);
     setTimeout(() => dmgFloat.remove(), 1000);
     
-    // Vital Berry logic check
     if(!def.fainted && def.hp > 0 && def.hp / def.baseHp <= 0.25 && def.item === "vitalberry" && !def.itemUsed) {
       def.itemUsed = true;
       const heal = Math.round(def.baseHp * 0.25);
@@ -841,6 +966,7 @@ function resolveTurn(pAct, aiAct){
       playHealSound();
       logLines.push(`<b>${def.name} consumed its Vital Berry and healed ${heal} HP!</b>`);
     }
+    
     if(!def.fainted && def.hp > 0 && def.statusEffects && def.statusEffects.length > 0 && def.hp / def.baseHp <= 0.30 && def.item === "puredew" && !def.itemUsed) {
       def.itemUsed = true;
       const cured = [...def.statusEffects];
@@ -848,7 +974,6 @@ function resolveTurn(pAct, aiAct){
       logLines.push(`<b>${def.name} consumed Pure Dew and cured ${cured.map(k=>STATUS_EFFECTS[k].icon).join("")}!</b>`);
     }
 
-    // Poison tick on defender after hit
     if (!def.fainted && def.hp > 0 && def.statusEffects && def.statusEffects.includes("poison")) {
       const tick = resolveStatusTick(def);
       if (tick && tick !== "skip") {
@@ -858,38 +983,70 @@ function resolveTurn(pAct, aiAct){
     }
 
     if(def.hp <= 0){
-      def.fainted = true; logLines.push(`<b>${def.name} fainted!</b>`);
-      defEl.classList.add("faint"); setTimeout(()=>defEl.classList.remove("faint"), 500);
+      def.fainted = true; 
+      logLines.push(`<b>${def.name} fainted!</b>`);
+      defEl.classList.add("faint"); 
+      setTimeout(()=>defEl.classList.remove("faint"), 500);
     }
+    
     renderBattle(false);
+    updateLog();
+
+    // The magical turn pacing delay!
+    if(activePlayer().fainted || activeFoe().fainted) break;
+    if (i < order.length - 1) await delay(1800); 
   }
   
-  order.forEach(doMove);
+  // Phase 3: Post-turn cleanup (Weather & checking for end of battle)
   renderBattle(false);
   advanceWeather();
   if (weather.type !== "none") {
     const w = WEATHER_CONDITIONS[weather.type];
     logLines.push(`<span style="color:${w.color}">${w.icon} ${w.name} (${weather.turnsLeft}t)</span>`);
+    updateLog();
   }
-  document.getElementById("battle-log").innerHTML = logLines.join("<br>");
 
-  setTimeout(()=>{
-    if(battle.player.every(m=>m.fainted)) return endBattle(false);
-    if(battle.foe.every(m=>m.fainted)) return endBattle(true);
-    if(activeFoe().fainted){ battle.fIndex = battle.foe.findIndex(m=>!m.fainted); document.getElementById("battle-log").innerHTML = `${battle.opponentName} sends out <b>${activeFoe().name}</b>!`; renderBattle(true); }
-    if(activePlayer().fainted){ renderBattle(true); document.getElementById("battle-log").innerHTML = "<b>Choose your next rift-form!</b>"; return openSwitchPanel(true); }
-    awaitingInput = true; buildActionPanel();
-  }, 750);
+  // Brief pause before fading to switch UI or game over
+  await delay(1200);
+
+  if(battle.player.every(m=>m.fainted)) return endBattle(false);
+  if(battle.foe.every(m=>m.fainted)) return endBattle(true);
+  
+  if(activeFoe().fainted){ 
+      battle.fIndex = battle.foe.findIndex(m=>!m.fainted); 
+      logLines.push(`${battle.opponentName} sends out <b>${activeFoe().name}</b>!`); 
+      updateLog();
+      renderBattle(true); 
+  }
+  if(activePlayer().fainted){ 
+      renderBattle(true); 
+      logLines.push("<b>Choose your next rift-form!</b>");
+      updateLog();
+      return openSwitchPanel(true); 
+  }
+  
+  awaitingInput = true; 
+  buildActionPanel();
 }
 
-function forcedSwitchTo(i){ battle.pIndex = i; renderBattle(true); document.getElementById("battle-log").innerHTML = `You send out <b>${activePlayer().name}</b>!`; awaitingInput = true; buildActionPanel(); }
+function forcedSwitchTo(i){ 
+    battle.pIndex = i; 
+    renderBattle(true); 
+    document.getElementById("battle-log").innerHTML = `You send out <b>${activePlayer().name}</b>!`; 
+    awaitingInput = true; 
+    buildActionPanel(); 
+}
 
 function endBattle(won){
   battle.over = true;
   if (won) playVictorySound(); else playDefeatSound();
 
   if (battle.survival) {
-    handleSurvivalWaveEnd(won);
+    if (typeof handleSurvivalWaveEnd === "function") handleSurvivalWaveEnd(won);
+    return;
+  }
+  if (battle.tournament) {
+    if (typeof processTourneyMatchEnd === "function") processTourneyMatchEnd(won);
     return;
   }
 
@@ -901,9 +1058,13 @@ function endBattle(won){
   const goldReward = won ? 85 : 20;
   const tierXpReward = won ? 60 : 10;
   
+  const format = typeof window.formatNum === "function" ? window.formatNum : (n => n);
+  const trackQuest = typeof window.trackQuestProgress === "function" ? window.trackQuestProgress : (() => {});
+  const addTier = typeof window.addTierXp === "function" ? window.addTierXp : (() => false);
+
   save.vp = Math.max(0, save.vp + vpChange);
-  if (won) trackQuestProgress("win_battles", 1);
-  trackQuestProgress("earn_gold", goldReward);
+  if (won) trackQuest("win_battles", 1);
+  trackQuest("earn_gold", goldReward);
   save.gold += goldReward;
   save.playerXp += xpReward;
   if(won) save.wins++; else save.losses++;
@@ -913,7 +1074,7 @@ function endBattle(won){
     save.playerXp -= getPlayerMaxXp(save.playerLevel); save.playerLevel++; save.gems += 50; playerLvlUp = true;
   }
   
-  const tierLvlUp = addTierXp(tierXpReward);
+  const tierLvlUp = addTier(tierXpReward);
   
   battle.player.forEach(m => {
     let mSave = save.mons.find(x => x.uid === m.uid);
@@ -929,21 +1090,23 @@ function endBattle(won){
     <div class="item"><span>Tier XP</span> <span>+${tierXpReward} ${tierLvlUp?"(TIER UP!)":""}</span></div>
     <div class="item"><span>Player XP</span> <span>+${xpReward} ${playerLvlUp?"(LVL UP!)":""}</span></div>
     <div class="item"><span>Roster XP</span> <span>+${xpReward} (x3)</span></div>
-    <div class="item"><span>Gold</span> <span>+${formatNum(goldReward)}</span></div>
+    <div class="item"><span>Gold</span> <span>+${format(goldReward)}</span></div>
   `;
-  document.getElementById("end-vp").textContent = (vpChange>0?"+":"") + formatNum(vpChange) + " VP";
+  document.getElementById("end-vp").textContent = (vpChange>0?"+":"") + format(vpChange) + " VP";
   document.getElementById("end-vp").className = "vp-change " + (vpChange>0?"pos":"neg");
-  document.getElementById("end-rank").textContent = `Now ${formatNum(save.vp)} VP — ${rankForVP(save.vp)}`;
+  document.getElementById("end-rank").textContent = `Now ${format(save.vp)} VP — ${rankForVP(save.vp)}`;
 
   setTimeout(()=> show("screen-end"), 600);
 }
 
-document.getElementById("btn-rematch").addEventListener("click", () => {
-  if (battle) {
-    const prevUids = battle.player.map(m => m.uid);
-    startPrep(prevUids);
-  } else {
-    buildSelectGrid();
-    show("screen-select");
-  }
-});
+if(document.getElementById("btn-rematch")) {
+  document.getElementById("btn-rematch").addEventListener("click", () => {
+    if (battle) {
+      const prevUids = battle.player.map(m => m.uid);
+      startMatchmaking(prevUids);
+    } else {
+      buildSelectGrid();
+      show("screen-select");
+    }
+  });
+}
