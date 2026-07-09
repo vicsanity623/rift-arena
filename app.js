@@ -313,6 +313,7 @@ document.getElementById("btn-confirm-team").addEventListener("click", ()=>{
 
 /* ============================= BATTLE SYSTEM ============================= */
 let battle = null;
+let awaitingInput = true; // Declare globally
 
 function instantiate(m) {
   return {
@@ -323,6 +324,9 @@ function instantiate(m) {
 }
 
 function startPrep(playerIds){
+  // Reset the input lock so consecutive battles don't freeze!
+  awaitingInput = true; 
+
   const avgPLevel = Math.max(1, Math.floor(playerIds.reduce((sum, id) => sum + getMonData(id).level, 0) / 3));
   
   // Opponents AI scales with player's average level + rank bonus
@@ -442,7 +446,6 @@ function openSwitchPanel(forced){
   }
 }
 
-let awaitingInput = true;
 function playerAct(action){
   if(!awaitingInput || battle.over) return;
   awaitingInput = false;
