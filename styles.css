@@ -47,6 +47,13 @@ button{ font-family:inherit; outline:none; }
 .xp-bar { width: 100px; height: 6px; background: #000; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1); overflow:hidden; }
 .xp-fill { height: 100%; background: linear-gradient(90deg, #00f2fe, var(--xp-blue)); width: 0%; transition: width 0.3s; }
 
+.tier-label { font-size: 11px; font-weight: bold; color: var(--gold); margin-top: 4px; letter-spacing: 0.5px; text-transform: uppercase; }
+.tier-bar { background: #1a1608; border-color: rgba(230,185,77,0.2); }
+.tier-fill { background: linear-gradient(90deg, var(--gold-dim), var(--warn)); }
+
+select.btn.ghost { background: var(--card-hi); border-radius: 8px; font-family: var(--body); }
+select.btn.ghost option { background: var(--bg); color: white; }
+
 .currencies { display: flex; gap: 8px; }
 .currency { background: rgba(0,0,0,0.4); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px 4px 6px; display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 13px; font-weight: bold; }
 .currency .icon { font-size: 14px; }
@@ -67,6 +74,7 @@ button{ font-family:inherit; outline:none; }
 .menu-card .desc { color:var(--text-dim); font-size:13px; margin-top:4px; }
 .glow-arrow { align-self:flex-end; color:var(--gold); font-family:var(--display); font-weight:800; font-size:14px; margin-top: 10px; }
 
+/* Dashboard fix for 6 cards */
 .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .dash-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; cursor: pointer; gap: 6px; }
 .dash-card:active { transform: scale(0.96); }
