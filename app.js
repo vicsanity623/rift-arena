@@ -826,13 +826,12 @@ function resolveTurn(pAct, aiAct){
   
   order.forEach(doMove);
   renderBattle(false);
-  document.getElementById("battle-log").innerHTML = logLines.join("<br>");
-
   advanceWeather();
   if (weather.type !== "none") {
     const w = WEATHER_CONDITIONS[weather.type];
     logLines.push(`<span style="color:${w.color}">${w.icon} ${w.name} (${weather.turnsLeft}t)</span>`);
   }
+  document.getElementById("battle-log").innerHTML = logLines.join("<br>");
 
   setTimeout(()=>{
     if(battle.player.every(m=>m.fainted)) return endBattle(false);
