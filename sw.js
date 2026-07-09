@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rift-arena-v2';
+const CACHE_NAME = 'rift-arena-v0.1.2';
 const ASSETS = [
   '/',
   '/index.html',
