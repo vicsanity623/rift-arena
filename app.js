@@ -21,18 +21,18 @@ const ITEMS = {
 };
 
 const ROSTER_DEF = [
-  ["cindrake","Cindrake","ember",70,65,55,70,"quickfeather","Inferno Pounce","smooth"],
-  ["pyrelope","Pyrelope","ember",75,80,60,85,"guardcharm","Solar Kick","spiky"],
-  ["tidenne","Tidenne","aqua",80,60,65,60,"ironscale","Riptide Spin","smooth"],
-  ["coralisk","Coralisk","aqua",90,70,85,50,"vitalberry","Abyssal Crush","angular"],
-  ["verdil","Verdil","verdant",75,60,60,75,"quickfeather","Thicket Charge","smooth"],
-  ["thornuke","Thornuke","verdant",95,75,90,40,"ironscale","Root Slam","spiky"],
-  ["sparkit","Sparkit","volt",60,65,50,95,"quickfeather","Static Burst","smooth"],
-  ["voltigo","Voltigo","volt",70,85,55,90,"steadfastsash","Thunder Fang","spiky"],
-  ["pebblin","Pebblin","stone",85,60,90,45,"ironscale","Pebble Barrage","angular"],
-  ["boulderon","Boulderon","stone",100,90,100,30,"guardcharm","Seismic Slam","spiky"],
-  ["gustling","Gustling","gale",65,70,55,90,"quickfeather","Gale Dash","smooth"],
-  ["zephyrn","Zephyrn","gale",75,85,60,100,"steadfastsash","Cyclone Strike","angular"]
+  ["cindrake","Cindrake","ember",70,65,55,70,"quickfeather","Inferno Pounce","smooth",15,"Cindrake Alpha"],
+  ["pyrelope","Pyrelope","ember",75,80,60,85,"guardcharm","Solar Kick","spiky",20,"Pyrelope Omega"],
+  ["tidenne","Tidenne","aqua",80,60,65,60,"ironscale","Riptide Spin","smooth",15,"Tidenne Alpha"],
+  ["coralisk","Coralisk","aqua",90,70,85,50,"vitalberry","Abyssal Crush","angular",20,"Coralisk Omega"],
+  ["verdil","Verdil","verdant",75,60,60,75,"quickfeather","Thicket Charge","smooth",15,"Verdil Alpha"],
+  ["thornuke","Thornuke","verdant",95,75,90,40,"ironscale","Root Slam","spiky",20,"Thornuke Omega"],
+  ["sparkit","Sparkit","volt",60,65,50,95,"quickfeather","Static Burst","smooth",15,"Sparkit Alpha"],
+  ["voltigo","Voltigo","volt",70,85,55,90,"steadfastsash","Thunder Fang","spiky",20,"Voltigo Omega"],
+  ["pebblin","Pebblin","stone",85,60,90,45,"ironscale","Pebble Barrage","angular",15,"Pebblin Alpha"],
+  ["boulderon","Boulderon","stone",100,90,100,30,"guardcharm","Seismic Slam","spiky",20,"Boulderon Omega"],
+  ["gustling","Gustling","gale",65,70,55,90,"quickfeather","Gale Dash","smooth",15,"Gustling Alpha"],
+  ["zephyrn","Zephyrn","gale",75,85,60,100,"steadfastsash","Cyclone Strike","angular",20,"Zephyrn Omega"]
 ];
 
 const TYPE_CHART = {
@@ -265,14 +265,19 @@ function generateDefaultSave() {
     mons: []
   };
   ["cindrake", "tidenne", "verdil", "sparkit"].forEach((id, i) => {
-    save.mons.push({ uid: "start_"+i, baseId: id, level: 1, xp: 0, heldItem: "none", mergeBonuses: {}, onExpedition: false });
+    save.mons.push({ uid: "start_"+i, baseId: id, level: 1, xp: 0, heldItem: "none", mergeBonuses: {}, onExpedition: false, evolved: false });
   });
   return save;
 }
 
 let save = (function(){
-  try{ const raw = localStorage.getItem(SAVE_KEY); if(raw) return {...generateDefaultSave(), ...JSON.parse(raw)}; }catch(e){}
-  return generateDefaultSave();
+  let s;
+  try{ const raw = localStorage.getItem(SAVE_KEY); if(raw) s = {...generateDefaultSave(), ...JSON.parse(raw)}; }catch(e){}
+  if (!s) s = generateDefaultSave();
+  // Migration: ensure all mons have evolved property
+  s.mons.forEach(m => { if (m.evolved === undefined) m.evolved = false; });
+  if (!s.shopStock) s.shopStock = null;
+  return s;
 })();
 function saveGame() { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); }
 
@@ -291,8 +296,13 @@ function getMonData(uid) {
   const defBonus = 1 + (mSave.mergeBonuses.def || 0);
   const spdBonus = 1 + (mSave.mergeBonuses.spd || 0);
   
+  const evoLevel = def[10] || 0;
+  const evoName = def[11] || "";
+  const evolved = mSave.evolved || false;
+  const displayName = evolved ? evoName : def[1];
+
   return {
-    uid: mSave.uid, baseId: def[0], name: def[1], type: def[2], 
+    uid: mSave.uid, baseId: def[0], name: displayName, type: def[2], 
     baseHp: Math.floor(def[3] * scale * hpBonus),
     atk: Math.floor(def[4] * scale * atkBonus),
     def: Math.floor(def[5] * scale * defBonus),
@@ -300,6 +310,9 @@ function getMonData(uid) {
     item: mSave.heldItem, sigName: def[8], shape: def[9],
     level: lvl, xp: mSave.xp, onExpedition: mSave.onExpedition,
     maxXp: getMonMaxXp(lvl),
+    evolvesAt: evoLevel,
+    evoName: evoName,
+    evolved: evolved,
     moves: [BASH, MOVES[def[2]], move(def[8], def[2], 80, 85)]
   };
 }
@@ -362,7 +375,7 @@ document.getElementById("card-summon").addEventListener("click", () => {
   
   const choice = ROSTER_DEF[Math.floor(Math.random() * ROSTER_DEF.length)];
   const uid = Date.now().toString() + Math.floor(Math.random()*1000);
-  save.mons.push({ uid: uid, baseId: choice[0], level: 1, xp: 0, heldItem: "none", mergeBonuses: {}, onExpedition: false });
+  save.mons.push({ uid: uid, baseId: choice[0], level: 1, xp: 0, heldItem: "none", mergeBonuses: {}, onExpedition: false, evolved: false });
   
   trackQuestProgress("summon", 1);
   saveGame(); refreshHome();
@@ -373,6 +386,7 @@ document.getElementById("card-summon").addEventListener("click", () => {
 document.getElementById("card-explore").addEventListener("click", ()=>{ initExploreUI(); show("screen-explore"); });
 document.getElementById("card-merge").addEventListener("click", ()=>{ initMergeUI(); show("screen-merge"); });
 document.getElementById("card-bag").addEventListener("click", ()=>{ initBagUI(); show("screen-bag"); });
+document.getElementById("card-shop").addEventListener("click", ()=>{ initShopUI(); show("screen-shop"); });
 document.getElementById("card-dojo").addEventListener("click", ()=>{ initDojoUI(); show("screen-dojo"); });
 
 document.getElementById("card-battle").addEventListener("click", ()=>{ buildSelectGrid(); show("screen-select"); });
@@ -433,6 +447,7 @@ function showMonDetails(m) {
     </div>
     
     <button class="btn gold" id="btn-lvlup" style="margin-top:10px;" ${m.onExpedition ? 'disabled' : ''}>Level Up (${formatNum(upgCost)} Gold)</button>
+    ${(!m.evolved && m.evolvesAt > 0 && m.level >= m.evolvesAt) ? `<button class="btn gold" id="btn-evolve" style="margin-top:8px; background:linear-gradient(135deg, #c084fc, #8b5cf6); color:white; border:none;">✨ Evolve to ${m.evoName} (FREE)</button>` : ''}
   `;
   
   show("screen-details");
@@ -444,6 +459,20 @@ function showMonDetails(m) {
     trackQuestProgress("level_up", 1);
     saveGame(); refreshHome(); showMonDetails(getMonData(m.uid));
   };
+
+  const evolveBtn = document.getElementById("btn-evolve");
+  if (evolveBtn) {
+    evolveBtn.onclick = () => {
+      const mSave = save.mons.find(x => x.uid === m.uid);
+      if (!mSave || mSave.evolved) return;
+      mSave.evolved = true;
+      saveGame();
+      const evolved = getMonData(m.uid);
+      alert(`✨ ${m.name} evolved into ${evolved.name}! All stats increased!`);
+      refreshHome();
+      showMonDetails(evolved);
+    };
+  }
 }
 
 /* ============================= TEAM SELECT ============================= */

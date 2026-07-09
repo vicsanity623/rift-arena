@@ -564,7 +564,7 @@ function claimExplore() {
     const oppPool = ROSTER_DEF.map(r=>r[0]);
     const rareId = oppPool[Math.floor(Math.random()*oppPool.length)];
     const def = ROSTER_DEF.find(r => r[0] === rareId);
-    save.mons.push({ uid: Date.now().toString(), baseId: rareId, level: 1, xp: 0, heldItem: "none", mergeBonuses: {}, onExpedition: false });
+    save.mons.push({ uid: Date.now().toString(), baseId: rareId, level: 1, xp: 0, heldItem: "none", mergeBonuses: {}, onExpedition: false, evolved: false });
     rareMsg = `<br><br>✨ <b>RARE FIND!</b> Found a wild ${def[1]}!`;
   }
   
@@ -736,4 +736,119 @@ function equipItem(uid, itemKey) {
   saveGame();
   alert("Item equipped!");
   initBagUI();
+}
+
+// --- SHOP / STORE ---
+const SHOP_ITEMS = [
+  { key:"vitalberry", name:"Vital Berry", desc:"Heals 25% at low HP", priceGold:80, priceGems:0, icon:"🫐" },
+  { key:"quickfeather", name:"Quick Feather", desc:"+10% Speed", priceGold:150, priceGems:0, icon:"🪶" },
+  { key:"ironscale", name:"Iron Scale", desc:"+15% Defense", priceGold:200, priceGems:0, icon:"🛡️" },
+  { key:"guardcharm", name:"Guard Charm", desc:"-10% Dmg taken", priceGold:250, priceGems:0, icon:"🍀" },
+  { key:"puredew", name:"Pure Dew", desc:"Cures status when HP<30%", priceGold:300, priceGems:0, icon:"💧" },
+  { key:"steadfastsash", name:"Steadfast Sash", desc:"Survives lethal hit once", priceGold:400, priceGems:0, icon:"🧣" },
+  { key:"gems_pack", name:"Gem Pack (50💎)", desc:"50 gems for gold", priceGold:500, priceGems:0, icon:"💎" },
+];
+
+const SHOP_REFRESH_KEY = "rift_shop_refresh";
+
+function getShopStock() {
+  if (!save.shopStock || save.shopStock.date !== getDateString()) {
+    const rng = seededRandom("rift_shop_" + getDateString());
+    const shuffled = [...SHOP_ITEMS].sort(() => rng() - 0.5);
+    save.shopStock = {
+      date: getDateString(),
+      items: shuffled.slice(0, 4).map(item => ({
+        ...item,
+        stock: item.key === "gems_pack" ? 1 : 3 + Math.floor(rng() * 3)
+      })),
+      freeClaimed: false
+    };
+    saveGame();
+  }
+  return save.shopStock;
+}
+
+function initShopUI() {
+  const container = document.getElementById("shop-content");
+  container.innerHTML = "";
+
+  const stock = getShopStock();
+
+  // Free daily item
+  const freeCard = document.createElement("div");
+  freeCard.className = "details-card";
+  freeCard.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <h3 style="margin:0;">🎁 Daily Free Item</h3>
+        <p class="subtitle" style="margin:4px 0 0;">A free gift awaits you every day!</p>
+      </div>
+      <button class="btn gold" id="btn-free-shop" style="width:auto; padding:10px 20px;" ${stock.freeClaimed ? 'disabled' : ''}>
+        ${stock.freeClaimed ? "Claimed" : "Claim"}
+      </button>
+    </div>
+  `;
+  container.appendChild(freeCard);
+
+  if (!stock.freeClaimed) {
+    document.getElementById("btn-free-shop").onclick = () => {
+      const rng = seededRandom("rift_free_" + getDateString());
+      const items = Object.keys(save.bag);
+      const freeItem = items[Math.floor(rng() * items.length)];
+      save.bag[freeItem] = (save.bag[freeItem] || 0) + 1;
+      save.shopStock.freeClaimed = true;
+      saveGame();
+      alert(`🎁 Free item claimed: ${ITEMS[freeItem].name}!`);
+      initShopUI();
+    };
+  }
+
+  // Shop items
+  stock.items.forEach((item, idx) => {
+    const card = document.createElement("div");
+    card.className = "details-card";
+    card.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div style="flex:1;">
+          <div style="font-weight:bold; font-size:14px;">${item.icon} ${item.name}</div>
+          <div style="font-size:11px; color:var(--text-dim);">${item.desc}</div>
+          <div style="font-size:11px; color:var(--gold-dim); margin-top:4px;">
+            ${item.priceGold > 0 ? `🪙 ${item.priceGold}` : ""} ${item.priceGems > 0 ? `💎 ${item.priceGems}` : ""}
+            <span style="margin-left:8px; color:var(--text-dim);">Stock: ${item.stock}</span>
+          </div>
+        </div>
+        <button class="btn gold" id="btn-shop-buy-${idx}" style="width:auto; padding:10px 20px;" ${item.stock <= 0 ? 'disabled' : ''}>
+          Buy
+        </button>
+      </div>
+    `;
+    container.appendChild(card);
+
+    const buyBtn = document.getElementById("btn-shop-buy-" + idx);
+    if (buyBtn && item.stock > 0) {
+      buyBtn.onclick = () => purchaseShopItem(idx);
+    }
+  });
+}
+
+function purchaseShopItem(idx) {
+  const stock = getShopStock();
+  const item = stock.items[idx];
+  if (!item || item.stock <= 0) return;
+
+  if (item.key === "gems_pack") {
+    if (save.gold < item.priceGold) return alert("Not enough gold!");
+    save.gold -= item.priceGold;
+    save.gems += 50;
+  } else {
+    if (save.gold < item.priceGold) return alert("Not enough gold!");
+    save.gold -= item.priceGold;
+    save.bag[item.key] = (save.bag[item.key] || 0) + 1;
+  }
+
+  item.stock--;
+  saveGame();
+  alert(`Purchased ${item.name}!`);
+  initShopUI();
+  refreshHome();
 }
