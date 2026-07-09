@@ -1,3 +1,4 @@
+[![pages-build-deployment](https://github.com/vicsanity623/rift-arena/actions/workflows/pages/pages-build-deployment/badge.svg?event=page_build)](https://github.com/vicsanity623/rift-arena/actions/workflows/pages/pages-build-deployment)
 # Rift Arena
 
 An original, ranked 3v3 turn-based creature battler with RPG progression, idle mechanics, and gacha summoning. Built as a lightweight Progressive Web App (PWA) — no build step, no database, no dependencies required.
