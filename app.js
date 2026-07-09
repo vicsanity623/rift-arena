@@ -51,6 +51,7 @@ function generateDefaultSave() {
     tierLevel: 1, tierXp: 0,
     lastIdleClaim: Date.now(),
     explore: { active: false },
+    dailyQuests: { date: "", quests: [] },
     bag: { vitalberry: 5, quickfeather: 2, ironscale: 2 },
     mons: []
   };
@@ -130,7 +131,8 @@ function refreshHome(){
 setInterval(() => {
   const diff = Date.now() - save.lastIdleClaim;
   const mins = Math.floor(diff / 60000);
-  document.getElementById("idle-status").textContent = mins > 0 ? `${mins}m stored` : "Claim";
+  const earned = mins * 3;
+  document.getElementById("idle-status").textContent = mins > 0 ? `${formatNum(earned)}🪙 stored` : "Claim";
 }, 1000);
 
 document.getElementById("card-idle").addEventListener("click", () => {
@@ -152,6 +154,7 @@ document.getElementById("card-summon").addEventListener("click", () => {
   const uid = Date.now().toString() + Math.floor(Math.random()*1000);
   save.mons.push({ uid: uid, baseId: choice[0], level: 1, xp: 0, heldItem: "none", mergeBonuses: {}, onExpedition: false });
   
+  trackQuestProgress("summon", 1);
   saveGame(); refreshHome();
   alert(`✨ Summoned a new ${choice[1]}! Added to roster.`);
 });
@@ -163,6 +166,7 @@ document.getElementById("card-bag").addEventListener("click", ()=>{ initBagUI();
 
 document.getElementById("card-battle").addEventListener("click", ()=>{ buildSelectGrid(); show("screen-select"); });
 document.getElementById("card-roster").addEventListener("click", ()=>{ buildRosterView(); show("screen-roster"); });
+document.getElementById("card-quests").addEventListener("click", ()=>{ initQuestsUI(); show("screen-quests"); });
 refreshHome();
 
 /* ============================= ROSTER & DETAILS ============================= */
@@ -226,6 +230,7 @@ function showMonDetails(m) {
     if (save.gold < upgCost) return alert("Not enough gold.");
     save.gold -= upgCost;
     save.mons.find(x => x.uid === m.uid).level++;
+    trackQuestProgress("level_up", 1);
     saveGame(); refreshHome(); showMonDetails(getMonData(m.uid));
   };
 }
@@ -304,8 +309,8 @@ function startPrep(playerUids){
   const pData = playerUids.map(uid => getMonData(uid));
   const avgPLevel = Math.max(1, Math.floor(pData.reduce((sum, m) => sum + m.level, 0) / 3));
   
-  // AI Level scales smoothly with Tier Level now
-  const aiLvl = Math.max(1, avgPLevel + save.tierLevel - 1);
+  // AI Level scales with Tier but caps relative to player
+  const aiLvl = Math.max(1, avgPLevel + Math.floor((save.tierLevel - 1) * 0.5));
 
   const oppPool = ROSTER_DEF.map(r=>r[0]);
   const oppIds = oppPool.sort(()=>Math.random()-0.5).slice(0,3);
@@ -413,7 +418,9 @@ function resolveTurn(pAct, aiAct){
     const mult = typeMultiplier(mv.type, def.type);
     if(mult === 0) { logLines.push(`${atk.name}'s move had no effect.`); return; }
     
+    const isCrit = Math.random() < 0.08;
     let raw = (atk.atk / def.effDef) * mv.power * 0.5 * mult * (0.85 + Math.random()*0.15);
+    if (isCrit) raw *= 1.8;
     if(def.item === "guardcharm") raw *= 0.9;
     let dmg = Math.max(1, Math.round(raw));
     
@@ -422,10 +429,27 @@ function resolveTurn(pAct, aiAct){
     
     if(!def.itemUsed && def.item === "steadfastsash" && dmg >= def.hp) { dmg = def.hp - 1; def.itemUsed = true; logLines.push(`${def.name} hung on using Steadfast Sash!`); }
     def.hp = Math.max(0, def.hp - dmg);
-    logLines.push(`${atk.name} used ${mv.name} for ${dmg} damage.` + (mult>1?" <b style='color:var(--gold)'>Super effective!</b>":""));
+    
+    let dmgLog = `${atk.name} used ${mv.name} for ${dmg} damage.`;
+    if (isCrit) dmgLog += " <b style='color:var(--danger);'>Critical hit!</b>";
+    if(mult>1) dmgLog += " <b style='color:var(--gold)'>Super effective!</b>";
+    logLines.push(dmgLog);
     
     const defEl = document.getElementById(side==="p"?"foe-mon":"player-mon");
-    defEl.classList.remove("hit"); void defEl.offsetWidth; defEl.classList.add("hit");
+    defEl.classList.remove("hit"); void defEl.offsetWidth; defEl.classList.add(isCrit ? "crit-hit" : "hit");
+    
+    // Screen shake + damage float
+    const arena = document.getElementById("arena");
+    arena.classList.remove("shake"); void arena.offsetWidth; arena.classList.add("shake");
+    
+    const dmgFloat = document.createElement("div");
+    dmgFloat.className = "dmg-float" + (isCrit ? " crit" : "");
+    dmgFloat.textContent = dmg;
+    const defRect = defEl.getBoundingClientRect(), arenaRect = arena.getBoundingClientRect();
+    dmgFloat.style.left = (defRect.left - arenaRect.left + defRect.width/2 - 20) + "px";
+    dmgFloat.style.top = (defRect.top - arenaRect.top + 10) + "px";
+    arena.appendChild(dmgFloat);
+    setTimeout(() => dmgFloat.remove(), 1000);
     
     // Vital Berry logic check
     if(!def.fainted && def.hp > 0 && def.hp / def.baseHp <= 0.25 && def.item === "vitalberry" && !def.itemUsed) {
@@ -467,6 +491,8 @@ function endBattle(won){
   const tierXpReward = won ? 60 : 10;
   
   save.vp = Math.max(0, save.vp + vpChange);
+  if (won) trackQuestProgress("win_battles", 1);
+  trackQuestProgress("earn_gold", goldReward);
   save.gold += goldReward;
   save.playerXp += xpReward;
   if(won) save.wins++; else save.losses++;
@@ -500,3 +526,13 @@ function endBattle(won){
 
   setTimeout(()=> show("screen-end"), 600);
 }
+
+document.getElementById("btn-rematch").addEventListener("click", () => {
+  if (battle) {
+    const prevUids = battle.player.map(m => m.uid);
+    startPrep(prevUids);
+  } else {
+    buildSelectGrid();
+    show("screen-select");
+  }
+});
