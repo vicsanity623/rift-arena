@@ -1651,6 +1651,21 @@ function updateTourneyDashboard() {
   }
 }
 
+// Hooks to systems.js for new cards
+if (document.getElementById("card-daily-login")) {
+  document.getElementById("card-daily-login").addEventListener("click", () => {
+    initDailyLoginUI();
+    show("screen-daily-login");
+  });
+}
+
+if (document.getElementById("card-guild")) {
+  document.getElementById("card-guild").addEventListener("click", () => {
+    initGuildUI();
+    show("screen-guild");
+  });
+}
+
 if (document.getElementById("btn-rematch")) {
   document.getElementById("btn-rematch").addEventListener("click", () => {
     if (battle) {
