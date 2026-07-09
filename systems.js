@@ -59,6 +59,13 @@ function claimDailyLogin() {
 
 function initDailyLoginUI() {
   ensureDailyLogin();
+
+  // Dynamically update home screen dashboard status description
+  const dashEl = document.getElementById("daily-login-dash");
+  if (dashEl) {
+    dashEl.textContent = save.dailyLogin.claimed ? "Claimed" : "Ready";
+  }
+
   const container = document.getElementById("daily-login-content");
   if (!container) return;
 
@@ -994,45 +1001,43 @@ function initLabUI() {
     const data = getMonData(m.uid);
     const vTag = m.variant ? ` ${VARIANTS[m.variant].icon}` : "";
     const opt = `<option value="${m.uid}">${vTag}${data.name} (Lv.${data.level})</option>`;
-    p1Html += opt;
-    p2Html += opt;
+    p1Html += opt; p2Html += opt;
   });
-  p1Html += `</select>`;
-  p2Html += `</select>`;
+  p1Html += `</select>`; p2Html += `</select>`;
 
-  container.innerHTML = `<div class="details-card">
-    <h3>🧬 Breeding Lab</h3>
-    <p class="subtitle">Breed 2 Lv.10+ Rift-forms to create a variant offspring!</p>
-    
-    <label style="font-size:12px; color:var(--text-dim);">Parent A:</label>
-    ${p1Html}
-    
-    <label style="font-size:12px; color:var(--text-dim); margin-top:10px;">Parent B:</label>
-    ${p2Html}
-    
-    <div class="lab-preview" id="lab-preview" style="margin:12px 0; padding:12px; background:var(--card-hi); border-radius:12px; border:1px solid var(--line); text-align:center; min-height:60px; display:flex; flex-direction:column; align-items:center; justify-content:center;">
-      <div style="color:var(--text-dim); font-size:13px;">Select two parents to see breed preview</div>
+  container.innerHTML = `
+    <div style="display:flex; flex-direction:column; gap:12px;">
+      <div class="details-card" style="align-items:center; text-align:center;">
+        <h3>Select Breeders</h3>
+        <p class="subtitle">Breeding consumes the raw power of two high-level Rift-forms to synthesize a brand new Variant at Lv.1.</p>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <label style="font-size:12px; color:var(--text-dim);">Parent A (Lv.10+):</label>
+        ${p1Html}
+        <label style="font-size:12px; color:var(--text-dim); margin-top:4px;">Parent B (Lv.10+):</label>
+        ${p2Html}
+      </div>
+      <div class="lab-preview" id="lab-preview" style="margin:12px 0; padding:12px; background:var(--card-hi); border-radius:12px; border:1px solid var(--line); text-align:center; min-height:60px; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+        <div style="color:var(--text-dim); font-size:13px;">Select parents to see offspring preview</div>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
+        <span style="color:var(--gold); font-family:var(--mono);">🪙 ${formatNum(breedCost)}</span>
+        <span id="lab-status" style="font-size:12px; color:var(--text-dim);"></span>
+      </div>
+      <button class="btn gold" id="btn-breed" disabled>🧬 Synthesize Variant</button>
     </div>
-    
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
-      <span style="color:var(--gold); font-family:var(--mono);">🪙 ${formatNum(breedCost)}</span>
-      <span id="lab-status" style="font-size:12px; color:var(--text-dim);"></span>
-    </div>
-    
-    <button class="btn gold" id="btn-breed" style="margin-top:12px;" disabled>Select Two Different Parents</button>
-  </div>`;
+  `;
 
   function updateBreedPreview() {
     const uid1 = document.getElementById("lab-parent1").value;
     const uid2 = document.getElementById("lab-parent2").value;
     const btn = document.getElementById("btn-breed");
     const preview = document.getElementById("lab-preview");
-    const status = document.getElementById("lab-status");
 
     if (uid1 === uid2) {
       btn.disabled = true;
       btn.textContent = "Must Select Two Different Parents";
-      preview.innerHTML = `<div style="color:var(--danger); font-size:13px;">⚠️ Select two different Rift-forms</div>`;
+      preview.innerHTML = `<div style="color:var(--danger); font-size:13px;">⚠️ Select two different parent Rift-forms</div>`;
       return;
     }
 
@@ -1043,21 +1048,20 @@ function initLabUI() {
     const def1 = ROSTER_DEF.find(r => r[0] === m1.baseId);
     const def2 = ROSTER_DEF.find(r => r[0] === m2.baseId);
 
-    // Randomly pick one parent's baseId and a random variant
+    // Seed preview based on IDs
     const chosenDef = Math.random() < 0.5 ? def1 : def2;
     const vKeys = Object.keys(VARIANTS);
-    const childVariant = vKeys[Math.floor(Math.random() * vKeys.length)];
-    const vDef = VARIANTS[childVariant];
-    const childType = vDef.typeOverride || chosenDef[2];
+    const mockVariant = vKeys[Math.floor(Math.random() * vKeys.length)];
+    const vDef = VARIANTS[mockVariant];
 
     const canAfford = save.gold >= breedCost;
     btn.disabled = !canAfford;
-    btn.textContent = canAfford ? `🧬 Breed (${formatNum(breedCost)}🪙)` : "Not Enough Gold";
+    btn.textContent = canAfford ? `🧬 Synthesize Variant` : `Need ${formatNum(breedCost)} 🪙`;
 
     preview.innerHTML = `
-      <div style="font-weight:bold; font-size:15px; color:var(--safe);"><span class="var-badge var-${childVariant}" style="display:inline-block;">${vDef.icon}</span> ${vDef.name} ${chosenDef[1]}</div>
-      <div style="font-size:12px; color:var(--text-dim);">Type: ${childType} · ${vDef.desc}</div>
-      <div style="font-size:11px; color:var(--gold-dim); margin-top:4px;">Parents: ${def1[1]} (Lv.${m1.level}) × ${def2[1]} (Lv.${m2.level})</div>
+      <div style="font-weight:bold; font-size:15px; color:var(--safe);"><span class="var-badge var-${mockVariant}" style="display:inline-block;">${vDef.icon}</span> ${vDef.name} ${chosenDef[1]}</div>
+      <div style="font-size:12px; color:var(--text-dim); margin-top:2px;">Type: ${chosenDef[2]} · Stat Boosts on synthesis</div>
+      <div style="font-size:11px; color:var(--gold-dim); margin-top:4px;">Gene Mix: ${def1[1]} × ${def2[1]}</div>
     `;
   }
 
@@ -1078,12 +1082,16 @@ function initLabUI() {
 
     const def1 = ROSTER_DEF.find(r => r[0] === m1.baseId);
     const def2 = ROSTER_DEF.find(r => r[0] === m2.baseId);
+
+    // Breeders are consumed
+    save.mons = save.mons.filter(m => m.uid !== uid1 && m.uid !== uid2);
+
     const chosenDef = Math.random() < 0.5 ? def1 : def2;
     const vKeys = Object.keys(VARIANTS);
     const childVariant = vKeys[Math.floor(Math.random() * vKeys.length)];
     const vDef = VARIANTS[childVariant];
 
-    const uid = Date.now().toString() + Math.floor(Math.random() * 1000);
+    const uid = "breed_" + Date.now().toString() + Math.floor(Math.random() * 100);
     save.mons.push({
       uid, baseId: chosenDef[0], level: 1, xp: 0,
       heldItem: "none", mergeBonuses: {}, onExpedition: false,
@@ -1091,7 +1099,7 @@ function initLabUI() {
     });
 
     saveGame();
-    alert(`🧬 Breeding successful!\n\nCreated: ${vDef.icon} ${vDef.name} ${chosenDef[1]} (Lv.1)\nParents: ${def1[1]} × ${def2[1]}`);
+    alert(`🧬 Gene Synthesis complete!\n\nBoth parents fused into a rare Variant:\n${vDef.icon} ${vDef.name} ${chosenDef[1]} (Lv.1)!`);
     refreshHome();
     initLabUI();
   };
