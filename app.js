@@ -554,15 +554,17 @@ function getMonData(uid) {
   const evoLevel = def[10] || 0;
   const evoName = def[11] || "";
   const evolved = mSave.evolved || false;
-  const displayName = evolved ? evoName : (variantDef ? variantDef.icon + " " + variantDef.name + " " + def[1] : def[1]);
+  const displayName = evolved ? (variantDef ? variantDef.icon + " " + variantDef.name + " " + evoName : evoName) : (variantDef ? variantDef.icon + " " + variantDef.name + " " + def[1] : def[1]);
   const displayType = variantDef && variantDef.typeOverride ? variantDef.typeOverride : def[2];
+
+  const evoMult = evolved ? 1.25 : 1;
 
   return {
     uid: mSave.uid, baseId: def[0], name: displayName, type: displayType,
-    baseHp: Math.floor(def[3] * scale * hpBonus * vMod.hp),
-    atk: Math.floor(def[4] * scale * atkBonus * vMod.atk),
-    def: Math.floor(def[5] * scale * defBonus * vMod.def),
-    spd: Math.floor(def[6] * scale * spdBonus * vMod.spd),
+    baseHp: Math.floor(def[3] * scale * hpBonus * vMod.hp * evoMult),
+    atk: Math.floor(def[4] * scale * atkBonus * vMod.atk * evoMult),
+    def: Math.floor(def[5] * scale * defBonus * vMod.def * evoMult),
+    spd: Math.floor(def[6] * scale * spdBonus * vMod.spd * evoMult),
     item: mSave.heldItem, sigName: def[8], shape: def[9],
     level: lvl, xp: mSave.xp, onExpedition: mSave.onExpedition,
     maxXp: getMonMaxXp(lvl),
@@ -818,11 +820,12 @@ function buildRosterView() {
     card.className = "cmon-card " + (m.onExpedition ? "locked" : "");
     const vBadge = m.variant ? `<span class="var-badge var-${m.variant}">${m.variantDef.icon}</span>` : "";
     const passive = getPassive(m.type);
+    const evoTag = m.evolved ? `<span class="evo-badge">✦</span>` : "";
     card.innerHTML = `
       <div class="row1">
-        <div class="orb t-${m.type}"><div class="glyph"></div></div>
+        <div class="orb t-${m.type} ${m.evolved ? 'evo-orb-glow' : ''}"><div class="glyph"></div></div>
         <div style="flex:1;">
-          <div class="name">${vBadge}${m.name} <span class="badge">Lv.${m.level}</span></div>
+          <div class="name">${vBadge}${evoTag}${m.name} <span class="badge">Lv.${m.level}</span></div>
           <div class="type">${m.type}${passive ? ` · ${passive.icon} ${passive.name}` : ''} ${m.onExpedition ? '(Exploring)' : ''} ${m.variant ? m.variantDef.name : ''}</div>
         </div>
       </div>
@@ -847,9 +850,11 @@ function showMonDetails(m) {
     </div>`;
 
   const vTag = m.variant ? `<div class="var-badge var-${m.variant}" style="display:inline-block; font-size:13px; padding:2px 10px;">${m.variantDef.icon} ${m.variantDef.name}</div>` : "";
+  const evoTag = m.evolved ? `<span class="evo-badge-lg">✦ EVOLVED</span>` : "";
   view.innerHTML = `
-    <div class="orb mon-big-orb t-${m.type}"><div class="glyph"></div></div>
-    <div style="text-align:center; font-family:var(--display); font-weight:800; font-size:22px;">${vTag} ${m.name} <span class="badge">Lv.${m.level}</span></div>
+    <div class="orb mon-big-orb t-${m.type} ${m.evolved ? 'evo-orb-glow' : ''}"><div class="glyph"></div></div>
+    <div style="text-align:center; font-family:var(--display); font-weight:800; font-size:22px;">${vTag} ${m.name} <span class="badge">Lv.${m.level}</span> ${evoTag}</div>
+    ${m.evolved ? `<div style="text-align:center; font-size:11px; color:var(--gold);">✦ Evolution Bonus: +25% All Stats</div>` : (m.evolvesAt > 0 ? `<div style="text-align:center; font-size:11px; color:var(--text-dim);">Evolves at Lv.${m.evolvesAt} → ${m.evoName} (+25% all stats)</div>` : '')}
     
     <div style="display:flex; flex-direction:column; gap:8px; margin-top:10px;">
       ${drawStat("HP", m.baseHp, 300)}
@@ -861,7 +866,7 @@ function showMonDetails(m) {
     <div style="font-size:12px; color:var(--text-dim); text-align:center; margin-top:10px;">
       Held item: ${ITEMS[m.item].name} — ${ITEMS[m.item].desc}
     </div>
-    ${(() => { const pa = getPassive(m.type); return pa ? `<div style="font-size:11px; color:var(--xp-blue); text-align:center; margin-top:6px;">${pa.icon} Passive: ${pa.name} — ${m.passiveDesc || pa.desc}</div>` : ""; })()}
+    ${m.evolved ? `<div style="font-size:11px; color:var(--gold-dim); text-align:center; margin-top:6px;">✦ Evolution Passive Boost: ${m.passiveDesc || (getPassive(m.type) ? getPassive(m.type).desc : '')}</div>` : (() => { const pa = getPassive(m.type); return pa ? `<div style="font-size:11px; color:var(--xp-blue); text-align:center; margin-top:6px;">${pa.icon} Passive: ${pa.name} — ${m.passiveDesc || pa.desc}</div>` : ""; })()}
     
     <button class="btn gold" id="btn-lvlup" style="margin-top:10px;" ${m.onExpedition ? 'disabled' : ''}>Level Up (${formatNum(upgCost)} Gold)</button>
     ${(!m.evolved && m.evolvesAt > 0 && m.level >= m.evolvesAt) ? `<button class="btn gold" id="btn-evolve" style="margin-top:8px; background:linear-gradient(135deg, #c084fc, #8b5cf6); color:white; border:none;">✨ Evolve to ${m.evoName} (FREE)</button>` : ''}
@@ -872,24 +877,134 @@ function showMonDetails(m) {
   document.getElementById("btn-lvlup").onclick = () => {
     if (save.gold < upgCost) return alert("Not enough gold.");
     save.gold -= upgCost;
-    save.mons.find(x => x.uid === m.uid).level++;
+    const mSave = save.mons.find(x => x.uid === m.uid);
+    mSave.level++;
     if (typeof trackQuestProgress === "function") trackQuestProgress("level_up", 1);
-    saveGame(); refreshHome(); showMonDetails(getMonData(m.uid));
+    saveGame();
+    const updated = getMonData(m.uid);
+    if (!mSave.evolved && updated.evolvesAt > 0 && mSave.level >= updated.evolvesAt) {
+      showEvolutionPrompt(updated);
+    } else {
+      refreshHome();
+      showMonDetails(updated);
+    }
   };
 
   const evolveBtn = document.getElementById("btn-evolve");
   if (evolveBtn) {
     evolveBtn.onclick = () => {
-      const mSave = save.mons.find(x => x.uid === m.uid);
-      if (!mSave || mSave.evolved) return;
-      mSave.evolved = true;
-      saveGame();
-      const evolved = getMonData(m.uid);
-      alert(`✨ ${m.name} evolved into ${evolved.name}! All stats increased!`);
-      refreshHome();
-      showMonDetails(evolved);
+      performEvolution(m.uid);
     };
   }
+}
+
+/* ============================= EVOLUTION SYSTEM ============================= */
+function performEvolution(uid) {
+  const mSave = save.mons.find(x => x.uid === uid);
+  if (!mSave || mSave.evolved) return;
+  const oldName = getMonData(uid).name;
+
+  showEvolutionAnimation(uid, () => {
+    mSave.evolved = true;
+    saveGame();
+    const evolved = getMonData(uid);
+    const oldView = document.getElementById("mon-details-view");
+    if (oldView) {
+      showMonDetails(evolved);
+    }
+    refreshHome();
+  });
+}
+
+function showEvolutionAnimation(uid, callback) {
+  const m = getMonData(uid);
+  const overlay = document.createElement("div");
+  overlay.id = "evo-overlay";
+  overlay.innerHTML = `
+    <div class="evo-container">
+      <div class="evo-orb t-${m.type} ${m.shape}">
+        <div class="evo-glow"></div>
+        <div class="evo-face"><div class="eye l"></div><div class="eye r"></div></div>
+      </div>
+      <div class="evo-name">${m.name}</div>
+      <div class="evo-label">is evolving...</div>
+      <div class="evo-bars">
+        <div class="evo-bar-row"><span class="evo-bar-label">HP</span><div class="evo-bar-track"><div class="evo-bar-fill" style="width:70%"></div></div></div>
+        <div class="evo-bar-row"><span class="evo-bar-label">ATK</span><div class="evo-bar-track"><div class="evo-bar-fill" style="width:70%"></div></div></div>
+        <div class="evo-bar-row"><span class="evo-bar-label">DEF</span><div class="evo-bar-track"><div class="evo-bar-fill" style="width:70%"></div></div></div>
+        <div class="evo-bar-row"><span class="evo-bar-label">SPD</span><div class="evo-bar-track"><div class="evo-bar-fill" style="width:70%"></div></div></div>
+      </div>
+    </div>
+  `;
+  document.getElementById("app").appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add("evo-active"));
+
+  const evoName = m.evoName || m.name;
+  const duration = 2500;
+  const startTime = Date.now();
+
+  function animStep() {
+    const elapsed = Date.now() - startTime;
+    const progress = Math.min(1, elapsed / duration);
+    const bars = overlay.querySelectorAll(".evo-bar-fill");
+    const orb = overlay.querySelector(".evo-orb");
+    const label = overlay.querySelector(".evo-label");
+
+    bars.forEach(bar => {
+      const currentW = 70 + progress * 25;
+      bar.style.width = Math.min(95, currentW) + "%";
+    });
+
+    if (progress > 0.5) {
+      orb.className = "evo-orb evo-evolved t-" + m.type + " " + m.shape;
+      label.textContent = "evolved into " + evoName + "!";
+    }
+
+    if (progress < 1) {
+      requestAnimationFrame(animStep);
+    } else {
+      setTimeout(() => {
+        overlay.classList.remove("evo-active");
+        overlay.classList.add("evo-fadeout");
+        setTimeout(() => overlay.remove(), 600);
+        if (callback) callback();
+      }, 500);
+    }
+  }
+
+  requestAnimationFrame(animStep);
+}
+
+function showEvolutionPrompt(m) {
+  const overlay = document.createElement("div");
+  overlay.id = "evo-prompt-overlay";
+  overlay.innerHTML = `
+    <div class="evo-prompt">
+      <div class="evo-prompt-orb t-${m.type} ${m.shape}"><div class="face"><div class="eye l"></div><div class="eye r"></div></div></div>
+      <div class="evo-prompt-title">Evolution Available!</div>
+      <div class="evo-prompt-desc">${m.name} has reached Lv.${m.level} and is ready to evolve into <strong>${m.evoName}</strong>!</div>
+      <div class="evo-prompt-stats">
+        <div>✦ All stats +25%</div>
+        <div>✦ Enhanced passive ability</div>
+        <div>✦ New visual form</div>
+      </div>
+      <div class="evo-prompt-btns">
+        <button class="btn gold" id="btn-evolve-prompt-yes">✨ Evolve Now</button>
+        <button class="btn ghost" id="btn-evolve-prompt-later">Later</button>
+      </div>
+    </div>
+  `;
+  document.getElementById("app").appendChild(overlay);
+
+  document.getElementById("btn-evolve-prompt-yes").onclick = () => {
+    overlay.remove();
+    performEvolution(m.uid);
+  };
+  document.getElementById("btn-evolve-prompt-later").onclick = () => {
+    overlay.remove();
+    refreshHome();
+    showMonDetails(m);
+  };
 }
 
 /* ============================= TEAM SELECT ============================= */
@@ -1370,8 +1485,8 @@ function renderBattle(fullRebuild) {
   if (pStatusEl) pStatusEl.innerHTML = (p.statusEffects || []).map(k => `<span style="color:${STATUS_EFFECTS[k].color}">${STATUS_EFFECTS[k].icon}</span>`).join(" ") + (p.passive ? `<span title="${p.passive}" style="opacity:0.6;font-size:11px;margin-left:4px;">${p.passiveIcon}</span>` : "");
   if (fStatusEl) fStatusEl.innerHTML = (f.statusEffects || []).map(k => `<span style="color:${STATUS_EFFECTS[k].color}">${STATUS_EFFECTS[k].icon}</span>`).join(" ") + (f.passive ? `<span title="${f.passive}" style="opacity:0.6;font-size:11px;margin-left:4px;">${f.passiveIcon}</span>` : "");
 
-  const pm = document.getElementById("player-mon"); pm.className = "mon " + p.shape + " t-" + p.type;
-  const fm = document.getElementById("foe-mon"); fm.className = "mon " + f.shape + " t-" + f.type;
+  const pm = document.getElementById("player-mon"); pm.className = "mon " + p.shape + " t-" + p.type + (p.evolved ? " evolved" : "");
+  const fm = document.getElementById("foe-mon"); fm.className = "mon " + f.shape + " t-" + f.type + (f.evolved ? " evolved" : "");
   (p.statusEffects || []).forEach(k => pm.classList.add(k === "freeze" ? "frozen" : k));
   (f.statusEffects || []).forEach(k => fm.classList.add(k === "freeze" ? "frozen" : k));
 
