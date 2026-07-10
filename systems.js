@@ -442,7 +442,8 @@ function generateSurvivalWave() {
     opponentName: trainer.name + ` (Wave ${survivalState.wave})`,
     personality: trainer.personality,
     over: false,
-    survival: true
+    survival: true,
+    pCombo: [], fCombo: []
   };
 
   const weatherKeys = Object.keys(WEATHER_CONDITIONS).filter(k => k !== "none");

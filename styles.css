@@ -214,9 +214,17 @@ select.btn.ghost option { background: var(--bg); color: white; }
 .dmg-float.crit{ font-size:28px; color:var(--danger); text-shadow:0 0 12px rgba(255,92,108,.6); }
 .dmg-float.heal{ font-size:22px; color:var(--safe); text-shadow:0 0 10px rgba(87,214,141,.5); animation:floatUp .9s ease forwards; }
 .dmg-float.self-hit{ font-size:16px; color:var(--danger); opacity:.7; animation:floatUp .9s ease forwards; }
+.dmg-float.combo{ font-size:22px; color:var(--gold); text-shadow:0 0 12px rgba(230,185,77,.6); animation:comboFloat 1.2s ease forwards; }
+@keyframes comboFloat{ 0%{ opacity:1; transform:translateY(0) scale(1.2);} 50%{ opacity:1; transform:translateY(-30px) scale(1.4);} 100%{ opacity:0; transform:translateY(-80px) scale(1);} }
 @keyframes floatUp{ 0%{ opacity:1; transform:translateY(0) scale(1);} 100%{ opacity:0; transform:translateY(-60px) scale(1.2);} }
 .arena.shake{ animation:arenaShake .35s ease; }
 @keyframes arenaShake{ 0%,100%{ transform:translateX(0);} 15%{ transform:translateX(-4px) rotate(-.5deg);} 30%{ transform:translateX(4px) rotate(.5deg);} 50%{ transform:translateX(-2px);} 70%{ transform:translateX(2px);} }
+
+/* Combo Tracker */
+.combo-tracker{ display:flex; flex-direction:column; gap:2px; padding:6px 10px; margin-bottom:6px; background:var(--card-hi); border:1px solid var(--line); border-radius:8px; min-height:24px; font-size:11px; font-family:var(--mono); }
+.combo-side{ display:flex; gap:6px; align-items:center; }
+.combo-label{ color:var(--text-dim); font-weight:600; }
+.combo-seq{ color:var(--gold); font-weight:700; letter-spacing:1px; }
 
 /* Battle Logs and Actions */
 .log{ background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 14px; font-size:13px; min-height:42px; max-height: 80px; overflow-y: auto; color:var(--text-dim); margin-bottom:10px; line-height: 1.5; transition: border-color .3s ease; }
