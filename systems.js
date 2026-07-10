@@ -1219,3 +1219,443 @@ function showGuildDashboard(container) {
     alert(`Donated 100 🪙 to the guild! Guild gained 50 XP.`);
   };
 }
+
+// --- DUNGEON / RAID SYSTEM ---
+const DUNGEON_DEFS = [
+  { id:"ember_caverns", name:"Ember Caverns", icon:"🌋", desc:"Blazing tunnels filled with fire-aligned creatures.", floors:5, minLevel:1, theme:"ember",
+    bossName:"Magma Tyrant", bossIds:["pyrelope","boulderon"],
+    loot:[
+      { floor:1, gold:60, gems:5, items:[], xp:80 },
+      { floor:2, gold:90, gems:8, items:[], xp:100 },
+      { floor:3, gold:120, gems:10, items:[], xp:120 },
+      { floor:4, gold:160, gems:12, items:["vitalberry"], xp:150 },
+      { floor:5, gold:400, gems:35, items:["ironscale","quickfeather"], xp:300, rareMonChance:0.3 }
+    ] },
+  { id:"abyssal_depths", name:"Abyssal Depths", icon:"🌊", desc:"Dark waters where aqua predators lurk in the depths.", floors:5, minLevel:5, theme:"aqua",
+    bossName:"Leviathan", bossIds:["coralisk","tidenne"],
+    loot:[
+      { floor:1, gold:100, gems:8, items:[], xp:120 },
+      { floor:2, gold:140, gems:12, items:[], xp:150 },
+      { floor:3, gold:180, gems:15, items:[], xp:180 },
+      { floor:4, gold:240, gems:18, items:["guardcharm"], xp:220 },
+      { floor:5, gold:600, gems:50, items:["steadfastsash","puredew"], xp:400, rareMonChance:0.4 }
+    ] },
+  { id:"storm_spire", name:"Storm Spire", icon:"⚡", desc:"A towering spire crackling with volt and gale energy.", floors:5, minLevel:10, theme:"volt",
+    bossName:"Storm Titan", bossIds:["voltigo","zephyrn"],
+    loot:[
+      { floor:1, gold:180, gems:12, items:[], xp:180 },
+      { floor:2, gold:240, gems:16, items:[], xp:220 },
+      { floor:3, gold:300, gems:20, items:[], xp:260 },
+      { floor:4, gold:380, gems:24, items:["quickfeather"], xp:300 },
+      { floor:5, gold:900, gems:70, items:["ironscale","guardcharm"], xp:500, rareMonChance:0.5 }
+    ] },
+  { id:"verdant_maw", name:"Verdant Maw", icon:"🌿", desc:"An overgrown chasm where nature has twisted into a deadly maze.", floors:6, minLevel:15, theme:"verdant",
+    bossName:"Ancient Treant", bossIds:["thornuke","verdil"],
+    loot:[
+      { floor:1, gold:250, gems:16, items:[], xp:220 },
+      { floor:2, gold:320, gems:20, items:[], xp:260 },
+      { floor:3, gold:400, gems:24, items:[], xp:300 },
+      { floor:4, gold:500, gems:30, items:["vitalberry"], xp:350 },
+      { floor:5, gold:600, gems:36, items:["puredew"], xp:400 },
+      { floor:6, gold:1200, gems:90, items:["steadfastsash","ironscale"], xp:600, rareMonChance:0.6 }
+    ] }
+];
+
+let dungeonState = null;
+
+function initDungeonUI() {
+  const container = document.getElementById("dungeon-content");
+  if (!container) return;
+  container.innerHTML = "";
+
+  if (dungeonState && dungeonState.active) {
+    showDungeonActive(container);
+  } else {
+    showDungeonSelect(container);
+  }
+}
+
+function showDungeonSelect(container) {
+  let html = `<div class="details-card" style="text-align:center;">
+    <h3>🏛️ Dungeon Raids</h3>
+    <p class="subtitle">Select a dungeon and lead your Rift-forms through dangerous floors. Defeat the boss to claim epic rewards!</p>
+  </div>`;
+
+  DUNGEON_DEFS.forEach((dd, idx) => {
+    const avgLevel = Math.max(1, Math.floor(save.mons.reduce((s, m) => {
+      const d = getMonData(m.uid); return s + d.level;
+    }, 0) / Math.max(1, save.mons.length)));
+    const locked = avgLevel < dd.minLevel;
+    const hasCleared = save.dungeonProgress && save.dungeonProgress[dd.id];
+    const clearedLabel = hasCleared ? "✓ Cleared" : `${dd.floors} Floors`;
+
+    html += `<div class="dungeon-card ${locked ? 'locked' : ''}" data-dungeon-idx="${idx}">
+      <div class="dun-header">
+        <div>
+          <div class="dun-name">${dd.icon} ${dd.name}</div>
+          <div class="dun-desc">${dd.desc}</div>
+        </div>
+        <div class="dun-icon">${hasCleared ? '✅' : '🏛️'}</div>
+      </div>
+      <div class="dun-meta">
+        <span>${clearedLabel}</span>
+        <span>Min Lv.${dd.minLevel}</span>
+        <span>Boss: ${dd.bossName}</span>
+      </div>
+    </div>`;
+  });
+
+  container.innerHTML = html;
+
+  container.querySelectorAll(".dungeon-card:not(.locked)").forEach(card => {
+    card.addEventListener("click", () => {
+      const idx = parseInt(card.dataset.dungeonIdx);
+      const dd = DUNGEON_DEFS[idx];
+      if (save.mons.filter(m => !m.onExpedition).length < 3) {
+        return alert("You need at least 3 available Rift-forms to enter a dungeon.");
+      }
+      buildSelectGrid();
+      battleMode = "dungeon";
+      window._pendingDungeonIdx = idx;
+      document.getElementById("btn-confirm-team").textContent = `Enter ${dd.name}`;
+      const survBtn = document.getElementById("btn-survival-team");
+      if (survBtn) survBtn.style.display = "none";
+      const tourneyBtn = document.getElementById("btn-tournament-team");
+      if (tourneyBtn) tourneyBtn.style.display = "none";
+      show("screen-select");
+    });
+  });
+}
+
+function showDungeonActive(container) {
+  const ds = dungeonState;
+  const dd = DUNGEON_DEFS[ds.dungeonIdx];
+  const currentFloor = ds.currentFloor;
+  const isBoss = currentFloor === dd.floors;
+
+  let dotsHtml = "";
+  for (let i = 1; i <= dd.floors; i++) {
+    const cleared = i < currentFloor;
+    const cur = i === currentFloor;
+    const isBossFloor = i === dd.floors;
+    dotsHtml += `<div class="dungeon-floor-dot ${cleared ? 'cleared' : ''} ${cur ? 'current' : ''} ${isBossFloor ? 'boss-dot' : ''}">${isBossFloor ? '👑' : i}</div>`;
+  }
+
+  const lootInfo = dd.loot.find(l => l.floor === currentFloor) || dd.loot[dd.loot.length - 1];
+
+  container.innerHTML = `
+    <div class="details-card" style="text-align:center;">
+      <div style="font-size:28px;">${dd.icon}</div>
+      <h3>${dd.name}</h3>
+      <div class="dungeon-floor-progress">${dotsHtml}</div>
+      <p class="subtitle">Floor ${currentFloor} / ${dd.floors}${isBoss ? ' — 👑 BOSS FLOOR' : ''}</p>
+    </div>
+    <div class="details-card" style="text-align:center;">
+      <div style="display:flex; justify-content:space-around; margin:8px 0;">
+        <div style="font-family:var(--mono); font-size:13px;">🪙 ${formatNum(lootInfo.gold)}</div>
+        <div style="font-family:var(--mono); font-size:13px;">💎 ${formatNum(lootInfo.gems)}</div>
+        <div style="font-family:var(--mono); font-size:13px;">✨ ${formatNum(lootInfo.xp)} XP</div>
+      </div>
+      ${lootInfo.items.length > 0 ? `<div style="font-size:12px; color:var(--text-dim);">Items: ${lootInfo.items.map(k => ITEMS[k] ? ITEMS[k].name : k).join(', ')}</div>` : ''}
+      ${isBoss ? `<div style="font-size:12px; color:var(--gold); margin-top:4px;">👑 Boss: ${dd.bossName} — Rare creature drop chance!</div>` : ''}
+      <button class="btn gold" id="btn-enter-dungeon-floor" style="margin-top:12px;">Enter Floor ${currentFloor}</button>
+      <button class="btn ghost" id="btn-retreat-dungeon" style="margin-top:4px;">Retreat (Keep Rewards)</button>
+    </div>
+  `;
+
+  document.getElementById("btn-enter-dungeon-floor").onclick = () => {
+    enterDungeonFloor();
+  };
+  document.getElementById("btn-retreat-dungeon").onclick = () => {
+    dungeonRetreat();
+  };
+}
+
+function startDungeon(teamUids, dungeonIdx) {
+  const dd = DUNGEON_DEFS[dungeonIdx];
+  if (!dd) return;
+
+  const pData = teamUids.map(uid => getMonData(uid));
+  dungeonState = {
+    active: true,
+    dungeonIdx: dungeonIdx,
+    currentFloor: 1,
+    player: pData,
+    totalRewards: { gold: 0, gems: 0, xp: 0 },
+    over: false
+  };
+
+  showDungeonActive(document.getElementById("dungeon-content"));
+  show("screen-dungeon");
+}
+
+function enterDungeonFloor() {
+  if (!dungeonState || !dungeonState.active) return;
+  const ds = dungeonState;
+  const dd = DUNGEON_DEFS[ds.dungeonIdx];
+  const currentFloor = ds.currentFloor;
+  const isBoss = currentFloor === dd.floors;
+
+  const baseLvl = Math.max(1, Math.floor(
+    ds.player.reduce((s, m) => s + m.level, 0) / 3
+  ) + currentFloor - 1);
+
+  let oppIds;
+  if (isBoss) {
+    oppIds = [...dd.bossIds];
+    while (oppIds.length < 3) {
+      const extra = ROSTER_DEF.map(r => r[0]).sort(() => Math.random() - 0.5).filter(id => !oppIds.includes(id));
+      oppIds.push(extra[0]);
+    }
+  } else {
+    let pool = [];
+    if (dd.theme && THEMED_ROSTER[dd.theme]) {
+      pool = [...THEMED_ROSTER[dd.theme]];
+    }
+    while (pool.length < 3) {
+      const extra = ROSTER_DEF.map(r => r[0]).sort(() => Math.random() - 0.5).filter(id => !pool.includes(id));
+      pool.push(extra[0]);
+    }
+    oppIds = pool.sort(() => Math.random() - 0.5).slice(0, 3);
+  }
+
+  const trainerName = isBoss ? dd.bossName : `${dd.name} Guardian`;
+
+  ds.player.forEach(m => {
+    if (!m.fainted) {
+      m.hp = m.baseHp;
+      m.statusEffects = [];
+      m.statusAtkMult = 1;
+      m.statusSkipTurns = 0;
+      m.itemUsed = false;
+    }
+  });
+  ds.pIndex = ds.player.findIndex(m => !m.fainted);
+  if (ds.pIndex === -1) ds.pIndex = 0;
+
+  battle = {
+    player: ds.player,
+    foe: oppIds.map(id => instantiateFoe(id, baseLvl)),
+    pIndex: ds.pIndex,
+    fIndex: 0,
+    opponentName: trainerName + ` (Floor ${currentFloor})`,
+    personality: isBoss ? "aggressive" : "balanced",
+    over: false,
+    dungeon: true,
+    pCombo: [], fCombo: []
+  };
+
+  const weatherKeys = Object.keys(WEATHER_CONDITIONS).filter(k => k !== "none");
+  if (Math.random() < 0.35) {
+    const wType = weatherKeys[Math.floor(Math.random() * weatherKeys.length)];
+    setWeather(wType, 3 + Math.floor(Math.random() * 3));
+  } else {
+    setWeather("none", 0);
+  }
+
+  document.getElementById("prep-player-slots").innerHTML = "";
+  document.getElementById("prep-foe-slots").innerHTML = "";
+  battle.player.forEach((m, i) => {
+    const passiveHtml = m.passive ? `<span class="passive-prep" title="${m.passive}: ${m.passiveDesc || ''}">${m.passiveIcon}</span>` : '';
+    document.getElementById("prep-player-slots").insertAdjacentHTML("beforeend",
+      `<div class="prep-slot ${i === 0 ? 'lead' : ''}"><div class="n">${i + 1}</div><div class="nm">${m.name} ${passiveHtml}</div></div>`);
+  });
+  battle.foe.forEach((m, i) => document.getElementById("prep-foe-slots").insertAdjacentHTML("beforeend",
+    `<div class="prep-slot ${i === 0 ? 'lead' : ''} hidden"><div class="n">${i + 1}</div><div class="nm">???</div></div>`));
+  document.getElementById("prep-foe-name").textContent = trainerName;
+
+  document.getElementById("prep-clock").textContent = "00:03";
+  show("screen-prep");
+  clearInterval(prepTimerHandle);
+  prepTimerHandle = setInterval(() => {
+    const t = parseInt(document.getElementById("prep-clock").textContent.slice(-1));
+    if (t <= 1) { clearInterval(prepTimerHandle); revealFoeAndBattle(); return; }
+    document.getElementById("prep-clock").textContent = "00:0" + (t - 1);
+  }, 1000);
+  document.getElementById("btn-skip-prep").onclick = () => { clearInterval(prepTimerHandle); revealFoeAndBattle(); };
+}
+
+function handleDungeonFloorEnd(won) {
+  if (!dungeonState || !dungeonState.active) return;
+
+  if (won) {
+    const dd = DUNGEON_DEFS[dungeonState.dungeonIdx];
+    const currentFloor = dungeonState.currentFloor;
+    const lootInfo = dd.loot.find(l => l.floor === currentFloor) || dd.loot[dd.loot.length - 1];
+
+    const goldReward = lootInfo.gold;
+    const gemsReward = lootInfo.gems;
+    const xpReward = lootInfo.xp;
+
+    dungeonState.totalRewards.gold += goldReward;
+    dungeonState.totalRewards.gems += gemsReward;
+    dungeonState.totalRewards.xp += xpReward;
+
+    save.gold += goldReward;
+    save.gems += gemsReward;
+    save.playerXp += xpReward;
+
+    while (save.playerXp >= getPlayerMaxXp(save.playerLevel)) {
+      save.playerXp -= getPlayerMaxXp(save.playerLevel);
+      save.playerLevel++;
+      save.gems += 50;
+    }
+
+    battle.player.forEach(m => {
+      let mSave = save.mons.find(x => x.uid === m.uid);
+      if (mSave) {
+        mSave.xp += xpReward;
+        while (mSave.xp >= getMonMaxXp(mSave.level)) {
+          mSave.xp -= getMonMaxXp(mSave.level);
+          mSave.level++;
+        }
+      }
+    });
+
+    lootInfo.items.forEach(itemKey => {
+      if (!save.bag[itemKey]) save.bag[itemKey] = 0;
+      save.bag[itemKey]++;
+    });
+
+    if (currentFloor === dd.floors) {
+      if (lootInfo.rareMonChance && Math.random() < lootInfo.rareMonChance) {
+        const pool = ROSTER_DEF.map(r => r[0]);
+        const rareId = pool[Math.floor(Math.random() * pool.length)];
+        const def = ROSTER_DEF.find(r => r[0] === rareId);
+        save.mons.push({
+          uid: "dungeon_" + Date.now().toString(),
+          baseId: rareId, level: 1, xp: 0,
+          heldItem: "none", mergeBonuses: {}, onExpedition: false,
+          evolved: false, variant: null
+        });
+        dungeonState._rareFound = def[1];
+      }
+    }
+
+    const isBoss = currentFloor === dd.floors;
+    if (isBoss) {
+      if (!save.dungeonProgress) save.dungeonProgress = {};
+      save.dungeonProgress[dd.id] = true;
+    }
+
+    saveGame();
+
+    const allFainted = battle.player.every(m => m.fainted);
+    if (allFainted) {
+      dungeonRetreat();
+      return;
+    }
+
+    showDungeonFloorEndUI(currentFloor, dd, lootInfo, isBoss);
+  } else {
+    dungeonRetreat();
+  }
+}
+
+function showDungeonFloorEndUI(floor, dd, lootInfo, isBoss) {
+  const container = document.getElementById("dungeon-floor-end-content");
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById("screen-dungeon-floor-end").classList.add("active");
+
+  const nextFloor = floor + 1;
+  const isLastFloor = floor >= dd.floors;
+
+  let itemHtml = "";
+  if (lootInfo.items.length > 0) {
+    itemHtml = lootInfo.items.map(k => ITEMS[k] ? ITEMS[k].name : k).join(", ");
+  }
+
+  container.innerHTML = `
+    <div class="dungeon-floor-end-banner ${isBoss ? 'boss' : ''}">${isBoss ? "👑 " + dd.bossName + " Defeated!" : "Floor " + floor + " Cleared!"}</div>
+    <div class="dungeon-floor-end-rewards">
+      <div class="item"><span>Gold</span><span>+${formatNum(lootInfo.gold)}</span></div>
+      <div class="item"><span>Gems</span><span>+${formatNum(lootInfo.gems)}</span></div>
+      <div class="item"><span>XP</span><span>+${formatNum(lootInfo.xp)}</span></div>
+      ${itemHtml ? `<div class="item"><span>Items</span><span>+${itemHtml}</span></div>` : ''}
+      ${dungeonState._rareFound ? `<div class="item" style="color:var(--gold);"><span>✨ Rare Find!</span><span>${dungeonState._rareFound}</span></div>` : ''}
+      ${isLastFloor ? `<div class="item" style="border-top:1px solid var(--line); padding-top:6px; margin-top:4px; color:var(--gold); font-weight:bold;"><span>Dungeon Complete!</span><span>🏆</span></div>` : ''}
+    </div>
+    <div class="dungeon-floor-end-actions">
+      ${!isLastFloor ? `<button class="btn gold" id="btn-next-floor">Next Floor →</button>` : `<button class="btn gold" id="btn-dungeon-complete">Claim Victory</button>`}
+      <button class="btn ghost" id="btn-dungeon-retreat">${isLastFloor ? 'Leave' : 'Retreat (Keep Rewards)'}</button>
+    </div>
+  `;
+
+  const nextBtn = document.getElementById("btn-next-floor");
+  if (nextBtn) {
+    nextBtn.onclick = () => {
+      dungeonState.currentFloor++;
+      dungeonState._rareFound = null;
+      document.getElementById("screen-dungeon-floor-end").classList.remove("active");
+      const cont = document.getElementById("dungeon-content");
+      showDungeonActive(cont);
+      show("screen-dungeon");
+    };
+  }
+
+  document.getElementById("btn-dungeon-complete").onclick = () => {
+    dungeonComplete();
+  };
+
+  document.getElementById("btn-dungeon-retreat").onclick = () => {
+    dungeonComplete();
+  };
+}
+
+function dungeonRetreat() {
+  if (!dungeonState) return;
+  const rewards = dungeonState.totalRewards;
+  const dd = DUNGEON_DEFS[dungeonState.dungeonIdx];
+  const floorsCleared = dungeonState.currentFloor - 1;
+
+  dungeonState.active = false;
+  dungeonState.over = true;
+
+  let msg = `Retreated from ${dd.name} after Floor ${floorsCleared}.\n\n`;
+  msg += `Rewards kept:\n🪙 ${formatNum(rewards.gold)}\n💎 ${formatNum(rewards.gems)}\n✨ ${formatNum(rewards.xp)} XP`;
+  if (dungeonState._rareFound) msg += `\n✨ Rare: ${dungeonState._rareFound}`;
+
+  dungeonState = null;
+  saveGame();
+  refreshHome();
+
+  document.getElementById("screen-dungeon-floor-end").classList.remove("active");
+  alert(msg);
+  show("screen-home");
+}
+
+function dungeonComplete() {
+  if (!dungeonState) return;
+  const rewards = dungeonState.totalRewards;
+  const dd = DUNGEON_DEFS[dungeonState.dungeonIdx];
+
+  dungeonState.active = false;
+  dungeonState.over = true;
+
+  let msg = `🏆 ${dd.name} conquered! All ${dd.floors} floors cleared!\n\n`;
+  msg += `Total Rewards:\n🪙 ${formatNum(rewards.gold)}\n💎 ${formatNum(rewards.gems)}\n✨ ${formatNum(rewards.xp)} XP`;
+  if (dungeonState._rareFound) msg += `\n✨ Rare Creature: ${dungeonState._rareFound}!`;
+
+  dungeonState = null;
+  saveGame();
+
+  playVictorySound();
+  refreshHome();
+  alert(msg);
+  document.getElementById("screen-dungeon-floor-end").classList.remove("active");
+  show("screen-home");
+}
+
+function updateDungeonDash() {
+  const el = document.getElementById("dungeon-dash");
+  if (!el) return;
+  if (dungeonState && dungeonState.active) {
+    const dd = DUNGEON_DEFS[dungeonState.dungeonIdx];
+    el.textContent = `F${dungeonState.currentFloor}/${dd.floors}`;
+  } else {
+    const clearedCount = save.dungeonProgress ? Object.keys(save.dungeonProgress).length : 0;
+    el.textContent = clearedCount > 0 ? `${clearedCount}/${DUNGEON_DEFS.length} cleared` : "Raid";
+  }
+}
+
+setInterval(updateDungeonDash, 5000);

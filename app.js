@@ -494,6 +494,7 @@ function refreshHome() {
   if (typeof updateExploreDash === "function") updateExploreDash();
   if (typeof updateDojoDash === "function") updateDojoDash();
   if (typeof updateTourneyDashboard === "function") updateTourneyDashboard();
+  if (typeof updateDungeonDash === "function") updateDungeonDash();
   if (typeof initDailyLoginUI === "function") initDailyLoginUI();
   if (typeof initGuildUI === "function") initGuildUI();
 }
@@ -769,6 +770,12 @@ document.getElementById("btn-confirm-team").addEventListener("click", () => {
   if (pickOrder.length !== 3) return;
   if (battleMode === "tournament") {
     startTournamentMode(pickOrder.slice());
+  } else if (battleMode === "dungeon") {
+    const idx = window._pendingDungeonIdx;
+    window._pendingDungeonIdx = null;
+    if (typeof startDungeon === "function" && idx !== undefined) {
+      startDungeon(pickOrder.slice(), idx);
+    }
   } else {
     startMatchmaking(pickOrder.slice());
   }
@@ -1558,6 +1565,10 @@ function endBattle(won) {
     if (typeof handleSurvivalWaveEnd === "function") handleSurvivalWaveEnd(won);
     return;
   }
+  if (battle.dungeon) {
+    if (typeof handleDungeonFloorEnd === "function") handleDungeonFloorEnd(won);
+    return;
+  }
   if (battle.tournament) {
     handleTourneyMatchEnd(won);
     return;
@@ -1759,6 +1770,13 @@ if (document.getElementById("card-guild")) {
   document.getElementById("card-guild").addEventListener("click", () => {
     initGuildUI();
     show("screen-guild");
+  });
+}
+
+if (document.getElementById("card-dungeon")) {
+  document.getElementById("card-dungeon").addEventListener("click", () => {
+    if (typeof initDungeonUI === "function") initDungeonUI();
+    show("screen-dungeon");
   });
 }
 
