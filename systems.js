@@ -1426,11 +1426,15 @@ function enterDungeonFloor() {
 
   ds.player.forEach(m => {
     if (!m.fainted) {
+      m.effDef = Math.round(m.def * (m.item === "ironscale" ? 1.15 : 1));
       m.hp = m.baseHp;
       m.statusEffects = [];
       m.statusAtkMult = 1;
       m.statusSkipTurns = 0;
       m.itemUsed = false;
+      m._baseSpd = m.spd;
+      m._baseDef = m.def;
+      if (typeof triggerPassiveOnInit === "function") triggerPassiveOnInit(m);
     }
   });
   ds.pIndex = ds.player.findIndex(m => !m.fainted);
@@ -1596,9 +1600,12 @@ function showDungeonFloorEndUI(floor, dd, lootInfo, isBoss) {
     };
   }
 
-  document.getElementById("btn-dungeon-complete").onclick = () => {
-    dungeonComplete();
-  };
+  const completeBtn = document.getElementById("btn-dungeon-complete");
+  if (completeBtn) {
+    completeBtn.onclick = () => {
+      dungeonComplete();
+    };
+  }
 
   document.getElementById("btn-dungeon-retreat").onclick = () => {
     dungeonComplete();
