@@ -417,3 +417,26 @@ select.btn.ghost option { background: var(--bg); color: white; }
 .subtitle{ font-size: 13px; color: var(--text-dim); line-height: 1.5; margin: 0 0 12px; }
 
 .footer-bar{ display: flex; gap: 10px; width: 100%; margin-top: 8px; }
+
+/* Dungeon System */
+.dungeon-card{ background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:16px; display:flex; flex-direction:column; gap:10px; cursor:pointer; transition:border-color .15s ease, transform .12s ease; }
+.dungeon-card:active{ transform:scale(.97); }
+.dungeon-card.locked{ opacity:.5; filter:grayscale(60%); pointer-events:none; }
+.dungeon-card.boss{ border-color:var(--gold); box-shadow:0 0 0 1px var(--gold) inset; }
+.dungeon-card .dun-header{ display:flex; justify-content:space-between; align-items:center; }
+.dungeon-card .dun-icon{ font-size:32px; }
+.dungeon-card .dun-name{ font-family:var(--display); font-weight:800; font-size:16px; }
+.dungeon-card .dun-desc{ font-size:12px; color:var(--text-dim); }
+.dungeon-card .dun-meta{ display:flex; gap:12px; font-family:var(--mono); font-size:11px; color:var(--gold-dim); }
+.dungeon-floor-progress{ display:flex; gap:6px; margin:4px 0; }
+.dungeon-floor-dot{ width:20px; height:20px; border-radius:50%; background:var(--card-hi); border:1px solid var(--line); font-size:9px; display:flex; align-items:center; justify-content:center; }
+.dungeon-floor-dot.cleared{ background:var(--safe); border-color:var(--safe); color:#000; }
+.dungeon-floor-dot.current{ background:var(--gold); border-color:var(--gold); color:#000; }
+.dungeon-floor-dot.boss-dot{ border-color:var(--gold-dim); }
+.dungeon-floor-dot.boss-dot.cleared{ background:var(--gold); color:#000; }
+.dungeon-floor-dot.boss-dot.current{ box-shadow:0 0 10px rgba(230,185,77,.5); }
+
+.dungeon-floor-end-banner{ font-family:var(--display); font-weight:800; font-size:28px; text-align:center; }
+.dungeon-floor-end-banner.boss{ color:var(--gold); text-shadow:0 0 20px rgba(230,185,77,.4); }
+.dungeon-floor-end-rewards{ background:var(--card-hi); border:1px solid var(--line); border-radius:14px; padding:18px; min-width:220px; display:flex; flex-direction:column; gap:6px; }
+.dungeon-floor-end-actions{ display:flex; flex-direction:column; gap:8px; margin-top:12px; }
