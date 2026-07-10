@@ -68,31 +68,32 @@ function typeMultiplier(atkType, defType) { return (atkType === "neutral") ? 1 :
 
 const PASSIVE_ABILITIES = {
   ember: { name:"Blaze", icon:"🔥", desc:"15% chance to burn attackers when hit", 
-    onHit(owner, attacker) { if (Math.random() < 0.15 && !owner.fainted) { applyStatus(attacker, "burn"); return true; } return false; },
-    getEvoDesc:(lvl)=>`${Math.min(35, 15 + Math.floor(lvl/3))}% chance to burn attackers` },
+    onHit(owner, attacker) { const pct = owner.passiveBoost ? 0.25 : (0.15 + (owner.level||1) * 0.003); if (Math.random() < Math.min(0.45, pct) && !owner.fainted) { applyStatus(attacker, "burn"); return true; } return false; },
+    getEvoDesc:(lvl,evolved)=>evolved ? `${Math.min(45, 25 + Math.floor(lvl/3))}% chance to burn attackers` : `${Math.min(35, 15 + Math.floor(lvl/3))}% chance to burn attackers` },
   aqua: { name:"Tide", icon:"🌊", desc:"Heal 5% max HP at start of each turn",
-    onTurnStart(owner) { if (!owner.fainted && owner.hp < owner.baseHp) { const pct = 0.05 + (owner.level||1) * 0.002; const amt = Math.max(1, Math.floor(owner.baseHp * Math.min(0.12, pct))); owner.hp = Math.min(owner.baseHp, owner.hp + amt); return amt; } return 0; },
-    getEvoDesc:(lvl)=>`Heal ${Math.min(12, 5 + Math.floor(lvl/2))}% max HP each turn` },
+    onTurnStart(owner) { if (!owner.fainted && owner.hp < owner.baseHp) { const pct = (owner.passiveBoost ? 0.08 : 0.05) + (owner.level||1) * 0.002; const amt = Math.max(1, Math.floor(owner.baseHp * Math.min(0.18, pct))); owner.hp = Math.min(owner.baseHp, owner.hp + amt); return amt; } return 0; },
+    getEvoDesc:(lvl,evolved)=>evolved ? `Heal ${Math.min(18, 8 + Math.floor(lvl/2))}% max HP each turn` : `Heal ${Math.min(12, 5 + Math.floor(lvl/2))}% max HP each turn` },
   verdant: { name:"Thorns", icon:"🌿", desc:"Reflect 20% of damage back to attacker",
-    onHit(owner, attacker) { if (!owner.fainted && !attacker.fainted) { const reflectPct = 0.20 + (owner.level||1) * 0.003; const reflect = Math.max(1, Math.floor(owner._lastDmg * Math.min(0.4, reflectPct))); attacker.hp = Math.max(0, attacker.hp - reflect); return reflect; } return 0; },
-    getEvoDesc:(lvl)=>`Reflect ${Math.min(40, 20 + Math.floor(lvl/2))}% damage back` },
+    onHit(owner, attacker) { if (!owner.fainted && !attacker.fainted) { const reflectPct = (owner.passiveBoost ? 0.30 : 0.20) + (owner.level||1) * 0.003; const reflect = Math.max(1, Math.floor(owner._lastDmg * Math.min(0.5, reflectPct))); attacker.hp = Math.max(0, attacker.hp - reflect); return reflect; } return 0; },
+    getEvoDesc:(lvl,evolved)=>evolved ? `Reflect ${Math.min(50, 30 + Math.floor(lvl/2))}% damage back` : `Reflect ${Math.min(40, 20 + Math.floor(lvl/2))}% damage back` },
   volt: { name:"Static", icon:"⚡", desc:"+15% Speed in battle", 
-    onInit(owner) { const boost = 1.15 + (owner.level||1) * 0.003; owner.spd = Math.floor(owner._baseSpd * Math.min(1.35, boost)); },
-    getEvoDesc:(lvl)=>`+${Math.min(35, 15 + Math.floor(lvl/2))}% Speed in battle` },
+    onInit(owner) { const boost = (owner.passiveBoost ? 1.25 : 1.15) + (owner.level||1) * 0.003; owner.spd = Math.floor(owner._baseSpd * Math.min(1.45, boost)); },
+    getEvoDesc:(lvl,evolved)=>evolved ? `+${Math.min(45, 25 + Math.floor(lvl/2))}% Speed in battle` : `+${Math.min(35, 15 + Math.floor(lvl/2))}% Speed in battle` },
   stone: { name:"Fortify", icon:"🪨", desc:"+15% Defense in battle",
-    onInit(owner) { const boost = 1.15 + (owner.level||1) * 0.003; owner.effDef = Math.floor(owner._baseDef * Math.min(1.35, boost)); },
-    getEvoDesc:(lvl)=>`+${Math.min(35, 15 + Math.floor(lvl/2))}% Defense in battle` },
+    onInit(owner) { const boost = (owner.passiveBoost ? 1.25 : 1.15) + (owner.level||1) * 0.003; owner.effDef = Math.floor(owner._baseDef * Math.min(1.45, boost)); },
+    getEvoDesc:(lvl,evolved)=>evolved ? `+${Math.min(45, 25 + Math.floor(lvl/2))}% Defense in battle` : `+${Math.min(35, 15 + Math.floor(lvl/2))}% Defense in battle` },
   gale: { name:"Evasion", icon:"💨", desc:"10% chance to dodge attacks",
-    onDefend(owner) { const chance = 0.10 + (owner.level||1) * 0.002; return Math.random() < Math.min(0.25, chance); },
-    getEvoDesc:(lvl)=>`${Math.min(25, 10 + Math.floor(lvl/2))}% chance to dodge attacks` }
+    onDefend(owner) { const chance = (owner.passiveBoost ? 0.18 : 0.10) + (owner.level||1) * 0.002; return Math.random() < Math.min(0.32, chance); },
+    getEvoDesc:(lvl,evolved)=>evolved ? `${Math.min(32, 18 + Math.floor(lvl/2))}% chance to dodge attacks` : `${Math.min(25, 10 + Math.floor(lvl/2))}% chance to dodge attacks` }
 };
 function getPassive(type) { return PASSIVE_ABILITIES[type] || null; }
 function triggerPassiveOnInit(mon) {
   const p = getPassive(mon.type);
+  mon.passiveBoost = mon.evolved === true;
   if (p && p.onInit) p.onInit(mon);
   mon.passive = p ? p.name : null;
   mon.passiveIcon = p ? p.icon : null;
-  mon.passiveDesc = p && p.getEvoDesc ? p.getEvoDesc(mon.level||1) : (p ? p.desc : null);
+  mon.passiveDesc = p && p.getEvoDesc ? p.getEvoDesc(mon.level||1, mon.passiveBoost) : (p ? p.desc : null);
 }
 function triggerPassiveOnTurnStart(mon, logLines) {
   const p = getPassive(mon.type);
@@ -1306,6 +1307,7 @@ function instantiateFoe(baseId, lvl) {
   m.effDef = Math.round(m.def * (m.item === "ironscale" ? 1.15 : 1));
   m.hp = m.baseHp; m.itemUsed = false; m.fainted = false;
   m.statusEffects = []; m.statusAtkMult = 1; m.statusSkipTurns = 0;
+  m.evolved = lvl >= (def[10] || Infinity);
   triggerPassiveOnInit(m);
   return m;
 }
@@ -1367,8 +1369,8 @@ function renderBattle(fullRebuild) {
 
   const pStatusEl = document.getElementById("ally-status");
   const fStatusEl = document.getElementById("foe-status");
-  if (pStatusEl) pStatusEl.innerHTML = (p.statusEffects || []).map(k => `<span style="color:${STATUS_EFFECTS[k].color}">${STATUS_EFFECTS[k].icon}</span>`).join(" ") + (p.passive ? `<span title="${p.passive}" style="opacity:0.6;font-size:11px;margin-left:4px;">${p.passiveIcon}</span>` : "");
-  if (fStatusEl) fStatusEl.innerHTML = (f.statusEffects || []).map(k => `<span style="color:${STATUS_EFFECTS[k].color}">${STATUS_EFFECTS[k].icon}</span>`).join(" ") + (f.passive ? `<span title="${f.passive}" style="opacity:0.6;font-size:11px;margin-left:4px;">${f.passiveIcon}</span>` : "");
+  if (pStatusEl) pStatusEl.innerHTML = (p.statusEffects || []).map(k => `<span style="color:${STATUS_EFFECTS[k].color}">${STATUS_EFFECTS[k].icon}</span>`).join(" ") + (p.passive ? `<span title="${p.passive}: ${p.passiveDesc||''}" style="opacity:0.8;font-size:13px;margin-left:4px;${p.passiveBoost ? 'text-shadow:0 0 6px var(--gold);' : ''}">${p.passiveIcon}</span>` : "");
+  if (fStatusEl) fStatusEl.innerHTML = (f.statusEffects || []).map(k => `<span style="color:${STATUS_EFFECTS[k].color}">${STATUS_EFFECTS[k].icon}</span>`).join(" ") + (f.passive ? `<span title="${f.passive}: ${f.passiveDesc||''}" style="opacity:0.8;font-size:13px;margin-left:4px;${f.passiveBoost ? 'text-shadow:0 0 6px var(--gold);' : ''}">${f.passiveIcon}</span>` : "");
 
   const pm = document.getElementById("player-mon"); pm.className = "mon " + p.shape + " t-" + p.type;
   const fm = document.getElementById("foe-mon"); fm.className = "mon " + f.shape + " t-" + f.type;
@@ -1413,6 +1415,16 @@ function aiPickAction() {
   const personality = AI_PERSONALITIES[battle.personality] || AI_PERSONALITIES.balanced;
   const aliveFoes = battle.foe.filter(m => !m.fainted);
 
+  /* --- PATTERN RECOGNITION: track player move type frequency --- */
+  if (!battle._playerTypeHistory) battle._playerTypeHistory = [];
+  const typeHistory = battle._playerTypeHistory;
+  let predictedPlayerType = null;
+  if (typeHistory.length >= 2) {
+    const freq = {};
+    typeHistory.forEach(t => { freq[t] = (freq[t] || 0) + 1; });
+    predictedPlayerType = Object.keys(freq).reduce((a, b) => freq[a] > freq[b] ? a : b, typeHistory[0]);
+  }
+
   /* --- THREAT ASSESSMENT --- */
   const bestPlyrMove = p.moves.reduce((best, mv) => {
     const s = mv.power * typeMultiplier(mv.type, f.type);
@@ -1445,6 +1457,20 @@ function aiPickAction() {
     }
   }
 
+  /* --- PREDICTIVE COMBO DENIAL --- */
+  let predictComboThreat = false, predictResistType = null;
+  if (predictedPlayerType && battle.pCombo && battle.pCombo.length >= 1) {
+    const testSeq = [...battle.pCombo, predictedPlayerType];
+    for (const key in ELEMENTAL_COMBOS) {
+      const parts = key.split("_");
+      if (parts.length === testSeq.length && parts.every((t, i) => t === testSeq[i])) {
+        predictComboThreat = true;
+        predictResistType = predictedPlayerType;
+        comboScore = Math.max(comboScore, ELEMENTAL_COMBOS[key].mult || 1);
+      }
+    }
+  }
+
   /* --- STATUS-AWARE SWITCH CHECK --- */
   const hasHarmfulStatus = f.statusEffects && f.statusEffects.length > 0 &&
     (f.statusEffects.includes("burn") || f.statusEffects.includes("poison")) &&
@@ -1457,9 +1483,15 @@ function aiPickAction() {
 
     // Combo threat evasion — more aggressive if combo is powerful
     const comboThreatThreshold = comboScore > 1.8 ? 0.65 : 0.5;
-    if (comboThreat && (f.hp / f.baseHp) <= comboThreatThreshold && personality.dmgWeight >= 1.0) {
+    if ((comboThreat || predictComboThreat) && (f.hp / f.baseHp) <= comboThreatThreshold && personality.dmgWeight >= 1.0) {
       shouldSwitch = true;
       switchPriority = 2;
+    }
+
+    // Predictive combo threat — switch even if HP is high
+    if (predictComboThreat && comboScore > 1.5 && personality.switchChance > 0.2 && Math.random() < personality.switchChance * 1.2) {
+      shouldSwitch = true;
+      switchPriority = Math.max(switchPriority, 1.8);
     }
 
     // Harmful status — defensive/tactician personalities more likely to switch
@@ -1492,6 +1524,10 @@ function aiPickAction() {
         if (comboResistType && typeMultiplier(comboResistType, candidate.type) < 1) {
           resistScore += 0.3;
         }
+        // Bonus for predictive combo-resistant switch
+        if (predictResistType && typeMultiplier(predictResistType, candidate.type) < 1) {
+          resistScore += 0.25;
+        }
 
         // Passive synergy bonus — switch to a mon whose passive counters player
         const candPassive = getPassive(candidate.type);
@@ -1499,6 +1535,9 @@ function aiPickAction() {
           if (candPassive.name === "Evasion" && p.atk > p.def) resistScore += 0.1;
           if (candPassive.name === "Thorns" && p.atk > p.spd) resistScore += 0.1;
           if (candPassive.name === "Fortify") resistScore += 0.05;
+          if (candPassive.name === "Static") resistScore += 0.05;
+          // Evolved passive bonus
+          if (candidate.passiveBoost) resistScore += 0.08;
         }
 
         // HP bonus — prefer healthier mons
@@ -1527,16 +1566,21 @@ function aiPickAction() {
     let comboBuildBonus = 1;
     if (battle.fCombo && battle.fCombo.length >= 1) {
       const seq = battle.fCombo;
+      let foundComboMult = 0;
       for (const key in ELEMENTAL_COMBOS) {
         const parts = key.split("_");
         if (parts.length > seq.length + 1) continue;
         if (parts.slice(0, seq.length).every((t, i) => t === seq[i]) && parts[seq.length] === mv.type) {
-          comboBuildBonus = 1.25;
+          const comboMult = ELEMENTAL_COMBOS[key].mult || 1;
+          foundComboMult = Math.max(foundComboMult, comboMult);
+          comboBuildBonus = 1.2 + Math.min(0.3, comboMult * 0.15);
           break;
         }
       }
       // Continue existing chain bonus
       if (mv.type === seq[seq.length - 1]) comboBuildBonus = Math.max(comboBuildBonus, 1.15);
+      // Extra bonus if resulting combo is powerful
+      if (foundComboMult > 1.5) comboBuildBonus += 0.15;
     }
 
     // Finishing move bonus
@@ -1546,7 +1590,12 @@ function aiPickAction() {
     const statusBonus = (!p.statusEffects || p.statusEffects.length === 0) &&
       { ember: "burn", aqua: "freeze", volt: "burn", gale: "freeze" }[mv.type] ? 1.1 : 1;
 
-    const s = effPower * mult * weatherMult * typeWeight * accFactor * personality.dmgWeight * comboBuildBonus * finishBonus * statusBonus;
+    // Passive synergy on offense
+    const atkPassive = getPassive(f.type);
+    let passiveOffenseBonus = 1;
+    if (atkPassive && atkPassive.name === "Static") passiveOffenseBonus = 1.08;
+
+    const s = effPower * mult * weatherMult * typeWeight * accFactor * personality.dmgWeight * comboBuildBonus * finishBonus * statusBonus * passiveOffenseBonus;
     if (s > bScore) { bScore = s; best = mv; }
   });
 
@@ -1645,6 +1694,13 @@ async function resolveTurn(pAct, aiAct) {
     }
 
     const mv = side === "p" ? pAct.move : aiAct.move;
+
+    // Track player move types for AI pattern recognition
+    if (side === "p" && mv) {
+      if (!battle._playerTypeHistory) battle._playerTypeHistory = [];
+      battle._playerTypeHistory.push(mv.type);
+      if (battle._playerTypeHistory.length > 8) battle._playerTypeHistory.shift();
+    }
 
     if (triggerPassiveOnDefend(def)) {
       const dp = getPassive(def.type);
