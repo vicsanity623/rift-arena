@@ -171,6 +171,23 @@ function getWeatherMult(atkType, defType) {
   return w ? w.modify(atkType, defType) : 1;
 }
 
+function updateWeatherOverlay() {
+  const arena = document.getElementById("arena");
+  if (!arena) return;
+  let overlay = document.getElementById("weather-overlay");
+  if (!overlay) {
+    overlay = document.createElement("div"); overlay.id = "weather-overlay";
+    overlay.className = "weather-overlay";
+    arena.insertBefore(overlay, arena.firstChild);
+  }
+  if (weather && weather.type !== "none") {
+    overlay.className = "weather-overlay " + weather.type;
+    overlay.style.display = "block";
+  } else {
+    overlay.style.display = "none";
+  }
+}
+
 /* ============================= TRAINER TEMPLATES & AI ============================= */
 const TRAINER_TEMPLATES = [
   { name: "Epidemic", theme: null, personality: "balanced", desc: "Balanced challenger" },
@@ -1116,19 +1133,27 @@ function renderBattle(fullRebuild) {
 
   let wEl = document.getElementById("weather-display");
   if (!wEl) {
-    wEl = document.createElement("div"); wEl.id = "weather-display";
-    wEl.style = "position:absolute; top:10px; right:10px; background:rgba(0,0,0,0.5); padding:4px 8px; border-radius:8px; font-size:12px; z-index:10;";
-    const arena = document.getElementById("arena");
-    if (arena) arena.appendChild(wEl);
+    const wb = document.querySelector(".weather-bar");
+    wEl = wb || (() => {
+      const e = document.createElement("div"); e.id = "weather-display";
+      e.className = "weather-bar";
+      const arena = document.getElementById("arena");
+      if (arena) arena.prepend(e);
+      return e;
+    })();
   }
 
   if (weather && weather.type !== "none") {
     const w = WEATHER_CONDITIONS[weather.type];
-    wEl.textContent = `${w.icon} ${w.name} (${weather.turnsLeft}t)`;
-    wEl.style.display = "block";
+    wEl.innerHTML = `<span class="weather-icon">${w.icon}</span><span class="weather-name">${w.name}</span><span class="weather-turns">${weather.turnsLeft}t</span>`;
+    wEl.style.display = "flex";
+    wEl.style.color = w.color;
+    wEl.style.borderBottom = `1px solid ${w.color}33`;
   } else {
     wEl.style.display = "none";
   }
+
+  updateWeatherOverlay();
 
   const pStatusEl = document.getElementById("ally-status");
   const fStatusEl = document.getElementById("foe-status");
@@ -1227,10 +1252,13 @@ async function resolveTurn(pAct, aiAct) {
     const logEl = document.getElementById("battle-log");
     logEl.innerHTML = logLines.join("<br>");
     logEl.scrollTop = logEl.scrollHeight;
+    logEl.classList.remove("new-entry"); void logEl.offsetWidth; logEl.classList.add("new-entry");
   };
 
   if (pAct.kind === "switch") {
     battle.pIndex = pAct.index;
+    const pm = document.getElementById("player-mon");
+    if (pm) { pm.classList.remove("switch-in"); void pm.offsetWidth; pm.classList.add("switch-in"); }
     logLines.push(`You send out <b>${activePlayer().name}</b>!`);
     pActs = false;
     updateLog();
@@ -1239,6 +1267,8 @@ async function resolveTurn(pAct, aiAct) {
 
   if (aiAct.kind === "switch") {
     battle.fIndex = aiAct.index;
+    const fm = document.getElementById("foe-mon");
+    if (fm) { fm.classList.remove("switch-in"); void fm.offsetWidth; fm.classList.add("switch-in"); }
     logLines.push(`${battle.opponentName} sends out <b>${activeFoe().name}</b>!`);
     aiActs = false;
     updateLog();
@@ -1272,6 +1302,19 @@ async function resolveTurn(pAct, aiAct) {
       const tick = resolveStatusTick(atk);
       if (tick && tick !== "skip") {
         logLines.push(`${atk.name} took ${tick} burn damage.`);
+        const atkEl = document.getElementById(side === "p" ? "player-mon" : "foe-mon");
+        if (atkEl) {
+          const hf = document.createElement("div");
+          hf.className = "dmg-float self-hit"; hf.textContent = "-" + tick;
+          const arena = document.getElementById("arena");
+          if (arena) {
+            const tRect = atkEl.getBoundingClientRect(), aRect = arena.getBoundingClientRect();
+            hf.style.left = (tRect.left - aRect.left + tRect.width / 2 - 15) + "px";
+            hf.style.top = (tRect.top - aRect.top - 5) + "px";
+            arena.appendChild(hf);
+            setTimeout(() => hf.remove(), 1000);
+          }
+        }
         if (atk.hp <= 0) {
           atk.fainted = true;
           logLines.push(`<b>${atk.name} fainted from burn!</b>`);
@@ -1312,7 +1355,15 @@ async function resolveTurn(pAct, aiAct) {
     const atkEl = document.getElementById(side === "p" ? "player-mon" : "foe-mon");
     atkEl.classList.remove("lunge-r", "lunge-l"); void atkEl.offsetWidth; atkEl.classList.add(side === "p" ? "lunge-r" : "lunge-l");
 
-    if (!def.itemUsed && def.item === "steadfastsash" && dmg >= def.hp) { dmg = def.hp - 1; def.itemUsed = true; logLines.push(`${def.name} hung on using Steadfast Sash!`); }
+    if (!def.itemUsed && def.item === "steadfastsash" && dmg >= def.hp) {
+      dmg = def.hp - 1; def.itemUsed = true;
+      const targetEl = document.getElementById(side === "p" ? "player-mon" : "foe-mon");
+      if (targetEl) {
+        targetEl.classList.remove("item-activate"); void targetEl.offsetWidth;
+        targetEl.classList.add("item-activate");
+      }
+      logLines.push(`${def.name} hung on using Steadfast Sash!`);
+    }
     def.hp = Math.max(0, def.hp - dmg);
 
     let dmgLog = `${atk.name} used ${mv.name} for ${dmg} damage.`;
@@ -1326,7 +1377,14 @@ async function resolveTurn(pAct, aiAct) {
       const statusMap = { ember: "burn", aqua: "freeze", volt: "burn", gale: "freeze" };
       if (statusChance[mv.type] && Math.random() < statusChance[mv.type]) {
         const applied = applyStatus(def, statusMap[mv.type]);
-        if (applied) logLines.push(`<b>${def.name} was ${STATUS_EFFECTS[statusMap[mv.type]].icon} ${STATUS_EFFECTS[statusMap[mv.type]].name}ed!</b>`);
+        if (applied) {
+          logLines.push(`<b>${def.name} was ${STATUS_EFFECTS[statusMap[mv.type]].icon} ${STATUS_EFFECTS[statusMap[mv.type]].name}ed!</b>`);
+          const targetEl = document.getElementById(side === "p" ? "player-mon" : "foe-mon");
+          if (targetEl) {
+            targetEl.classList.remove("status-applied"); void targetEl.offsetWidth;
+            targetEl.classList.add("status-applied");
+          }
+        }
       }
     }
 
@@ -1352,6 +1410,22 @@ async function resolveTurn(pAct, aiAct) {
       const heal = Math.round(def.baseHp * 0.25);
       def.hp = Math.min(def.baseHp, def.hp + heal);
       playHealSound();
+      const targetEl = document.getElementById(side === "p" ? "player-mon" : "foe-mon");
+      if (targetEl) {
+        targetEl.classList.remove("item-activate"); void targetEl.offsetWidth;
+        targetEl.classList.add("item-activate");
+        const hf = document.createElement("div");
+        hf.className = "dmg-float heal";
+        hf.textContent = "+" + heal;
+        const arena = document.getElementById("arena");
+        if (arena) {
+          const tRect = targetEl.getBoundingClientRect(), aRect = arena.getBoundingClientRect();
+          hf.style.left = (tRect.left - aRect.left + tRect.width / 2 - 20) + "px";
+          hf.style.top = (tRect.top - aRect.top - 10) + "px";
+          arena.appendChild(hf);
+          setTimeout(() => hf.remove(), 1000);
+        }
+      }
       logLines.push(`<b>${def.name} consumed its Vital Berry and healed ${heal} HP!</b>`);
     }
 
@@ -1359,6 +1433,11 @@ async function resolveTurn(pAct, aiAct) {
       def.itemUsed = true;
       const cured = [...def.statusEffects];
       cureStatus(def);
+      const targetEl = document.getElementById(side === "p" ? "player-mon" : "foe-mon");
+      if (targetEl) {
+        targetEl.classList.remove("cured", "status-applied"); void targetEl.offsetWidth;
+        targetEl.classList.add("cured");
+      }
       logLines.push(`<b>${def.name} consumed Pure Dew and cured ${cured.map(k => STATUS_EFFECTS[k].icon).join("")}!</b>`);
     }
 
@@ -1366,6 +1445,19 @@ async function resolveTurn(pAct, aiAct) {
       const tick = resolveStatusTick(def);
       if (tick && tick !== "skip") {
         logLines.push(`${def.name} took ${tick} poison damage.`);
+        const defEl2 = document.getElementById(side === "p" ? "foe-mon" : "player-mon");
+        if (defEl2) {
+          const hf = document.createElement("div");
+          hf.className = "dmg-float self-hit"; hf.textContent = "-" + tick;
+          const arena = document.getElementById("arena");
+          if (arena) {
+            const tRect = defEl2.getBoundingClientRect(), aRect = arena.getBoundingClientRect();
+            hf.style.left = (tRect.left - aRect.left + tRect.width / 2 - 15) + "px";
+            hf.style.top = (tRect.top - aRect.top - 5) + "px";
+            arena.appendChild(hf);
+            setTimeout(() => hf.remove(), 1000);
+          }
+        }
         if (def.hp <= 0) { def.fainted = true; logLines.push(`<b>${def.name} fainted from poison!</b>`); }
       }
     }
@@ -1398,6 +1490,8 @@ async function resolveTurn(pAct, aiAct) {
 
   if (activeFoe().fainted) {
     battle.fIndex = battle.foe.findIndex(m => !m.fainted);
+    const fm = document.getElementById("foe-mon");
+    if (fm) { fm.classList.remove("switch-in"); void fm.offsetWidth; fm.classList.add("switch-in"); }
     logLines.push(`${battle.opponentName} sends out <b>${activeFoe().name}</b>!`);
     updateLog();
     renderBattle(true);
@@ -1414,6 +1508,8 @@ async function resolveTurn(pAct, aiAct) {
 
 function forcedSwitchTo(i) {
   battle.pIndex = i;
+  const pm = document.getElementById("player-mon");
+  if (pm) { pm.classList.remove("switch-in"); void pm.offsetWidth; pm.classList.add("switch-in"); }
   renderBattle(true);
   document.getElementById("battle-log").innerHTML = `You send out <b>${activePlayer().name}</b>!`;
   awaitingInput = true;

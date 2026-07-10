@@ -141,7 +141,10 @@ select.btn.ghost option { background: var(--bg); color: white; }
 .hpbar-fill.mid{ background:var(--warn); } .hpbar-fill.low{ background:var(--danger); }
 
 /* Weather & Status */
-.weather-bar{ text-align:center; padding:4px 10px; font-family:var(--display); font-weight:700; font-size:13px; border-bottom:1px solid var(--line); background:rgba(0,0,0,0.3); }
+.weather-bar{ text-align:center; padding:4px 10px; font-family:var(--display); font-weight:700; font-size:13px; border-bottom:1px solid var(--line); background:rgba(0,0,0,0.3); display:flex; align-items:center; justify-content:center; gap:6px; }
+.weather-bar .weather-icon{ font-size:16px; }
+.weather-bar .weather-name{ font-weight:800; }
+.weather-bar .weather-turns{ font-family:var(--mono); font-size:11px; opacity:.7; }
 .status-indicator{ display:flex; gap:4px; margin-top:3px; font-size:14px; }
 .mon.burned{ box-shadow:0 0 20px rgba(255,106,69,0.6), inset 0 0 20px rgba(255,106,69,0.3); animation:burnPulse 1s ease infinite; }
 @keyframes burnPulse{ 0%,100%{ box-shadow:0 0 20px rgba(255,106,69,0.6); } 50%{ box-shadow:0 0 35px rgba(255,106,69,0.9); } }
@@ -149,6 +152,35 @@ select.btn.ghost option { background: var(--bg); color: white; }
 @keyframes freezeShimmer{ 0%,100%{ filter:brightness(1) hue-rotate(0deg); } 50%{ filter:brightness(1.2) hue-rotate(-10deg) saturate(0.7); } }
 .mon.poisoned{ box-shadow:0 0 20px rgba(155,89,182,0.6), inset 0 0 15px rgba(155,89,182,0.3); animation:poisonDrip 1s ease infinite; }
 @keyframes poisonDrip{ 0%,100%{ filter:brightness(1); } 50%{ filter:brightness(0.8) saturate(0.5) hue-rotate(60deg); } }
+
+/* Status Application / Cure Flash */
+.mon.status-applied{ animation:statusFlash .5s ease; }
+@keyframes statusFlash{ 0%{ filter:brightness(1); } 30%{ filter:brightness(2) saturate(1.5); } 60%{ filter:brightness(1.3); } 100%{ filter:brightness(1); } }
+.mon.cured{ animation:cureSparkle .6s ease; }
+@keyframes cureSparkle{ 0%{ filter:brightness(1); } 25%{ filter:brightness(2) hue-rotate(60deg); } 50%{ filter:brightness(1.5) hue-rotate(-30deg); } 75%{ filter:brightness(1.2); } 100%{ filter:brightness(1); } }
+.mon.item-activate{ animation:itemFlash .45s ease; }
+@keyframes itemFlash{ 0%{ filter:brightness(1); } 20%{ filter:brightness(2.5) drop-shadow(0 0 10px var(--gold)); } 100%{ filter:brightness(1); } }
+
+/* Switch-in animation */
+.mon.switch-in{ animation:switchRise .4s ease; }
+@keyframes switchRise{ 0%{ opacity:0; transform:translateY(20px) scale(.7); } 60%{ transform:translateY(-4px) scale(1.05); } 100%{ opacity:1; transform:translateY(0) scale(1); } }
+
+/* Weather Overlay on Arena */
+.weather-overlay{ position:absolute; inset:0; pointer-events:none; z-index:2; transition:opacity .6s ease; }
+.weather-overlay.sunny{ background:radial-gradient(circle at 50% 0%, rgba(255,180,50,0.15), transparent 60%); animation:sunnyPulse 3s ease infinite; }
+@keyframes sunnyPulse{ 0%,100%{ opacity:.6; } 50%{ opacity:1; } }
+.weather-overlay.rain{ background:linear-gradient(180deg, transparent 0%, rgba(51,199,234,0.1) 100%); }
+.weather-overlay.rain::before{ content:""; position:absolute; inset:0; background: repeating-linear-gradient(transparent, transparent 12px, rgba(51,199,234,0.08) 12px, rgba(51,199,234,0.08) 14px); animation:rainFall .5s linear infinite; }
+@keyframes rainFall{ 0%{ transform:translateY(-20px); } 100%{ transform:translateY(20px); } }
+.weather-overlay.sandstorm{ background:radial-gradient(ellipse at 50% 80%, rgba(201,138,82,0.12), transparent 50%); }
+.weather-overlay.sandstorm::before{ content:""; position:absolute; inset:0; background: repeating-linear-gradient(80deg, transparent, transparent 30px, rgba(201,138,82,0.06) 30px, rgba(201,138,82,0.06) 32px); animation:sandDrift .8s linear infinite; }
+@keyframes sandDrift{ 0%{ transform:translateX(-30px); } 100%{ transform:translateX(30px); } }
+.weather-overlay.gale{ background:linear-gradient(90deg, transparent 30%, rgba(157,180,255,0.08) 50%, transparent 70%); }
+.weather-overlay.gale::before{ content:""; position:absolute; inset:0; background: repeating-linear-gradient(100deg, transparent, transparent 40px, rgba(157,180,255,0.04) 40px, rgba(157,180,255,0.04) 42px); animation:galeSweep .6s linear infinite; }
+@keyframes galeSweep{ 0%{ transform:translateX(-40px); } 100%{ transform:translateX(40px); } }
+.weather-overlay.overgrown{ background:radial-gradient(ellipse at 30% 100%, rgba(95,214,107,0.12), transparent 50%); }
+.weather-overlay.overgrown::before{ content:""; position:absolute; bottom:0; left:0; right:0; height:20%; background: repeating-linear-gradient(0deg, transparent, transparent 15px, rgba(95,214,107,0.06) 15px, rgba(95,214,107,0.06) 17px); animation:overgrow 2s ease infinite; }
+@keyframes overgrow{ 0%,100%{ opacity:.5; } 50%{ opacity:1; } }
 
 /* Sprites in battle */
 .field{ position:relative; flex:1; display:flex; align-items:center; justify-content:space-around; padding:8px 20px 18px; }
@@ -180,13 +212,17 @@ select.btn.ghost option { background: var(--bg); color: white; }
 @keyframes shake{ 0%,100%{ transform:translateX(0);} 20%{ transform:translateX(-6px) rotate(-1deg);} 40%{ transform:translateX(6px) rotate(1deg);} 60%{ transform:translateX(-4px);} 80%{ transform:translateX(4px);} }
 .dmg-float{ position:absolute; font-family:var(--display); font-weight:800; font-size:20px; color:var(--gold); pointer-events:none; z-index:10; animation:floatUp .9s ease forwards; text-shadow:0 2px 4px rgba(0,0,0,.6); }
 .dmg-float.crit{ font-size:28px; color:var(--danger); text-shadow:0 0 12px rgba(255,92,108,.6); }
+.dmg-float.heal{ font-size:22px; color:var(--safe); text-shadow:0 0 10px rgba(87,214,141,.5); animation:floatUp .9s ease forwards; }
+.dmg-float.self-hit{ font-size:16px; color:var(--danger); opacity:.7; animation:floatUp .9s ease forwards; }
 @keyframes floatUp{ 0%{ opacity:1; transform:translateY(0) scale(1);} 100%{ opacity:0; transform:translateY(-60px) scale(1.2);} }
 .arena.shake{ animation:arenaShake .35s ease; }
 @keyframes arenaShake{ 0%,100%{ transform:translateX(0);} 15%{ transform:translateX(-4px) rotate(-.5deg);} 30%{ transform:translateX(4px) rotate(.5deg);} 50%{ transform:translateX(-2px);} 70%{ transform:translateX(2px);} }
 
 /* Battle Logs and Actions */
-.log{ background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 14px; font-size:13px; min-height:42px; max-height: 80px; overflow-y: auto; color:var(--text-dim); margin-bottom:10px; line-height: 1.5; }
+.log{ background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 14px; font-size:13px; min-height:42px; max-height: 80px; overflow-y: auto; color:var(--text-dim); margin-bottom:10px; line-height: 1.5; transition: border-color .3s ease; }
 .log b{ color:var(--text); } .log .fx-superb{ color:var(--gold); font-weight:700; } .log .fx-weak{ color:var(--text-dim); font-style:italic; }
+.log.new-entry{ border-color:var(--gold); animation:logFlash .4s ease; }
+@keyframes logFlash{ 0%,100%{ border-color:var(--line); } 50%{ border-color:var(--gold-dim); } }
 
 .moves-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
 .movebtn{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:11px 12px; text-align:left; cursor:pointer; display:flex; flex-direction:column; gap:2px; transition: border-color 0.15s ease, box-shadow 0.15s ease; }
