@@ -386,6 +386,8 @@ function startSurvivalMode() {
       m.effDef = Math.round(m.def * (m.item === "ironscale" ? 1.15 : 1));
       m.hp = m.baseHp; m.itemUsed = false; m.fainted = false;
       m.statusEffects = []; m.statusAtkMult = 1; m.statusSkipTurns = 0;
+      m._baseSpd = m.spd; m._baseDef = m.def;
+      if (typeof triggerPassiveOnInit === "function") triggerPassiveOnInit(m);
       return m;
     }),
     pIndex: 0,

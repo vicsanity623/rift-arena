@@ -66,6 +66,22 @@ const TYPE_CHART = {
 };
 function typeMultiplier(atkType, defType) { return (atkType === "neutral") ? 1 : ((TYPE_CHART[atkType] && TYPE_CHART[atkType][defType]) || 1); }
 
+const PASSIVE_ABILITIES = {
+  ember: { name:"Blaze", icon:"🔥", desc:"15% chance to burn attackers when hit", onHit(owner, attacker) { if (Math.random() < 0.15 && !owner.fainted) { applyStatus(attacker, "burn"); return true; } return false; } },
+  aqua: { name:"Tide", icon:"🌊", desc:"Heal 5% max HP at start of each turn", onTurnStart(owner) { if (!owner.fainted && owner.hp < owner.baseHp) { const amt = Math.max(1, Math.floor(owner.baseHp * 0.05)); owner.hp = Math.min(owner.baseHp, owner.hp + amt); return amt; } return 0; } },
+  verdant: { name:"Thorns", icon:"🌿", desc:"Reflect 20% of damage back to attacker", onHit(owner, attacker) { if (!owner.fainted && !attacker.fainted) { const reflect = Math.max(1, Math.floor(owner._lastDmg * 0.2)); attacker.hp = Math.max(0, attacker.hp - reflect); return reflect; } return 0; } },
+  volt: { name:"Static", icon:"⚡", desc:"+15% Speed in battle", onInit(owner) { owner.spd = Math.floor(owner._baseSpd * 1.15); } },
+  stone: { name:"Fortify", icon:"🪨", desc:"+15% Defense in battle", onInit(owner) { owner.effDef = Math.floor(owner._baseDef * 1.15); } },
+  gale: { name:"Evasion", icon:"💨", desc:"10% chance to dodge attacks", onDefend(owner) { return Math.random() < 0.10; } }
+};
+function getPassive(type) { return PASSIVE_ABILITIES[type] || null; }
+function triggerPassiveOnInit(mon) {
+  const p = getPassive(mon.type);
+  if (p && p.onInit) p.onInit(mon);
+  mon.passive = p ? p.name : null;
+  mon.passiveIcon = p ? p.icon : null;
+}
+
 const ELEMENTAL_COMBOS = {
   "gale_ember": { name:"Firestorm", icon:"🌪️🔥", desc:"Bonus fire damage from wind-fanning", mult:1.5, effect:"dmgBoost", dur:"once" },
   "volt_aqua": { name:"Thunderstorm", icon:"⚡🌊", desc:"Stunning bolt through water", mult:1.4, effect:"stun", dur:"once" },
@@ -758,12 +774,13 @@ function buildRosterView() {
     const card = document.createElement("div");
     card.className = "cmon-card " + (m.onExpedition ? "locked" : "");
     const vBadge = m.variant ? `<span class="var-badge var-${m.variant}">${m.variantDef.icon}</span>` : "";
+    const passive = getPassive(m.type);
     card.innerHTML = `
       <div class="row1">
         <div class="orb t-${m.type}"><div class="glyph"></div></div>
         <div style="flex:1;">
           <div class="name">${vBadge}${m.name} <span class="badge">Lv.${m.level}</span></div>
-          <div class="type">${m.type} ${m.onExpedition ? '(Exploring)' : ''} ${m.variant ? m.variantDef.name : ''}</div>
+          <div class="type">${m.type}${passive ? ` · ${passive.icon} ${passive.name}` : ''} ${m.onExpedition ? '(Exploring)' : ''} ${m.variant ? m.variantDef.name : ''}</div>
         </div>
       </div>
       <div class="xp-bar" style="width:100%; margin-top:4px;"><div class="xp-fill" style="width:${(m.xp / m.maxXp) * 100}%"></div></div>
@@ -800,6 +817,7 @@ function showMonDetails(m) {
     <div style="font-size:12px; color:var(--text-dim); text-align:center; margin-top:10px;">
       Held item: ${ITEMS[m.item].name} — ${ITEMS[m.item].desc}
     </div>
+    ${(() => { const pa = getPassive(m.type); return pa ? `<div style="font-size:11px; color:var(--xp-blue); text-align:center; margin-top:6px;">${pa.icon} Passive: ${pa.name} — ${pa.desc}</div>` : ""; })()}
     
     <button class="btn gold" id="btn-lvlup" style="margin-top:10px;" ${m.onExpedition ? 'disabled' : ''}>Level Up (${formatNum(upgCost)} Gold)</button>
     ${(!m.evolved && m.evolvesAt > 0 && m.level >= m.evolvesAt) ? `<button class="btn gold" id="btn-evolve" style="margin-top:8px; background:linear-gradient(135deg, #c084fc, #8b5cf6); color:white; border:none;">✨ Evolve to ${m.evoName} (FREE)</button>` : ''}
@@ -851,10 +869,11 @@ function buildSelectGrid() {
     const m = getMonData(mSave.uid);
     const card = document.createElement("div");
     card.className = "cmon-card"; card.dataset.uid = m.uid;
+    const passive = getPassive(m.type);
     card.innerHTML = `
       <div class="pickbadge" style="display:none;"></div>
       <div class="row1"><div class="orb t-${m.type}"><div class="glyph"></div></div>
-      <div><div class="name">${m.name} <span class="badge">Lv.${m.level}</span></div><div class="type">${m.type}</div></div></div>
+      <div><div class="name">${m.name} <span class="badge">Lv.${m.level}</span></div><div class="type">${m.type}${passive ? ` ${passive.icon}` : ''}</div></div></div>
       <div class="stats">${statLine(m)}</div>
     `;
     card.onclick = () => togglePick(m.uid, card);
@@ -1174,6 +1193,8 @@ function startTourneyMatch(matchIdx) {
     m.effDef = Math.round(m.def * (m.item === "ironscale" ? 1.15 : 1));
     m.hp = m.baseHp; m.itemUsed = false; m.fainted = false;
     m.statusEffects = []; m.statusAtkMult = 1; m.statusSkipTurns = 0;
+    m._baseSpd = m.spd; m._baseDef = m.def;
+    triggerPassiveOnInit(m);
     return m;
   });
 
@@ -1200,7 +1221,7 @@ function startTourneyMatch(matchIdx) {
 
   document.getElementById("prep-player-slots").innerHTML = "";
   document.getElementById("prep-foe-slots").innerHTML = "";
-  battle.player.forEach((m, i) => document.getElementById("prep-player-slots").insertAdjacentHTML("beforeend", `<div class="prep-slot ${i === 0 ? 'lead' : ''}"><div class="n">${i + 1}</div><div class="nm">${m.name}</div></div>`));
+  battle.player.forEach((m, i) => document.getElementById("prep-player-slots").insertAdjacentHTML("beforeend", `<div class="prep-slot ${i === 0 ? 'lead' : ''}"><div class="n">${i + 1}</div><div class="nm">${m.name} ${m.passiveIcon || ''}</div></div>`));
   battle.foe.forEach((m, i) => document.getElementById("prep-foe-slots").insertAdjacentHTML("beforeend", `<div class="prep-slot ${i === 0 ? 'lead' : ''} hidden"><div class="n">${i + 1}</div><div class="nm">???</div></div>`));
   document.getElementById("prep-foe-name").textContent = aiOpp.trainer.name;
 
@@ -1232,9 +1253,11 @@ function instantiateFoe(baseId, lvl) {
     def: Math.floor(def[5] * scale), spd: Math.floor(def[6] * scale),
     moves: [BASH, MOVES[def[2]], move(def[8], def[2], 80, 85)], shape: def[9]
   };
+  m._baseSpd = m.spd; m._baseDef = m.def;
   m.effDef = Math.round(m.def * (m.item === "ironscale" ? 1.15 : 1));
   m.hp = m.baseHp; m.itemUsed = false; m.fainted = false;
   m.statusEffects = []; m.statusAtkMult = 1; m.statusSkipTurns = 0;
+  triggerPassiveOnInit(m);
   return m;
 }
 
@@ -1287,8 +1310,8 @@ function renderBattle(fullRebuild) {
 
   const pStatusEl = document.getElementById("ally-status");
   const fStatusEl = document.getElementById("foe-status");
-  if (pStatusEl) pStatusEl.innerHTML = (p.statusEffects || []).map(k => `<span style="color:${STATUS_EFFECTS[k].color}">${STATUS_EFFECTS[k].icon}</span>`).join(" ");
-  if (fStatusEl) fStatusEl.innerHTML = (f.statusEffects || []).map(k => `<span style="color:${STATUS_EFFECTS[k].color}">${STATUS_EFFECTS[k].icon}</span>`).join(" ");
+  if (pStatusEl) pStatusEl.innerHTML = (p.statusEffects || []).map(k => `<span style="color:${STATUS_EFFECTS[k].color}">${STATUS_EFFECTS[k].icon}</span>`).join(" ") + (p.passive ? `<span title="${p.passive}" style="opacity:0.6;font-size:11px;margin-left:4px;">${p.passiveIcon}</span>` : "");
+  if (fStatusEl) fStatusEl.innerHTML = (f.statusEffects || []).map(k => `<span style="color:${STATUS_EFFECTS[k].color}">${STATUS_EFFECTS[k].icon}</span>`).join(" ") + (f.passive ? `<span title="${f.passive}" style="opacity:0.6;font-size:11px;margin-left:4px;">${f.passiveIcon}</span>` : "");
 
   const pm = document.getElementById("player-mon"); pm.className = "mon " + p.shape + " t-" + p.type;
   const fm = document.getElementById("foe-mon"); fm.className = "mon " + f.shape + " t-" + f.type;
@@ -1339,17 +1362,57 @@ function aiPickAction() {
   }, null);
   const aiAtDisadvantage = bestPlyrMove && bestPlyrMove.score > 80;
 
-  if (aliveFoes.length > 1 && aiAtDisadvantage && (f.hp / f.baseHp) <= personality.switchBelowHpPct && Math.random() < personality.switchChance) {
-    let bestSwitch = null, bestResist = -1;
-    aliveFoes.forEach(candidate => {
-      if (candidate.uid === f.uid) return;
-      let totalDmg = 0;
-      p.moves.forEach(mv => { totalDmg += mv.power * typeMultiplier(mv.type, candidate.type); });
-      const avgMult = totalDmg / (p.moves.length * 100);
-      const resistScore = 1 - avgMult;
-      if (resistScore > bestResist) { bestResist = resistScore; bestSwitch = candidate; }
-    });
-    if (bestSwitch) return { kind: "switch", index: battle.foe.indexOf(bestSwitch) };
+  /* --- COMBO-AWARE AI --- */
+  let comboThreat = false;
+  let comboResistType = null;
+  if (battle.pCombo && battle.pCombo.length >= 2) {
+    const seq = battle.pCombo.slice(-2);
+    for (let len = 2; len <= 3; len++) {
+      for (const key in ELEMENTAL_COMBOS) {
+        const parts = key.split("_");
+        if (parts.length === len && parts.slice(0, seq.length).every((t, i) => t === seq[i])) {
+          const nextType = parts[seq.length];
+          if (nextType && typeMultiplier(nextType, f.type) > 1) {
+            comboThreat = true;
+            comboResistType = nextType;
+          }
+        }
+      }
+    }
+  }
+
+  if (aliveFoes.length > 1) {
+    let shouldSwitch = false;
+    let switchReason = 0;
+
+    // Combo threat evasion
+    if (comboThreat && (f.hp / f.baseHp) <= 0.5) {
+      shouldSwitch = true;
+      switchReason = 1.5;
+    }
+
+    // Standard disadvantage check
+    if (aiAtDisadvantage && (f.hp / f.baseHp) <= personality.switchBelowHpPct && Math.random() < personality.switchChance) {
+      shouldSwitch = true;
+      switchReason = Math.max(switchReason, 1);
+    }
+
+    if (shouldSwitch) {
+      let bestSwitch = null, bestResist = -1;
+      aliveFoes.forEach(candidate => {
+        if (candidate.uid === f.uid) return;
+        let totalDmg = 0;
+        p.moves.forEach(mv => { totalDmg += mv.power * typeMultiplier(mv.type, candidate.type); });
+        const avgMult = totalDmg / (p.moves.length * 100);
+        let resistScore = 1 - avgMult;
+        // Bonus for combo-resistant switch
+        if (comboResistType && typeMultiplier(comboResistType, candidate.type) < 1) {
+          resistScore += 0.3;
+        }
+        if (resistScore > bestResist) { bestResist = resistScore; bestSwitch = candidate; }
+      });
+      if (bestSwitch) return { kind: "switch", index: battle.foe.indexOf(bestSwitch) };
+    }
   }
 
   let best = null, bScore = -1;
@@ -1360,7 +1423,9 @@ function aiPickAction() {
     const stabBonus = mv.type === f.type ? personality.stabBonus : 1;
     const effPower = mv.power * stabBonus;
     const typeWeight = mult > 1 ? 1.3 : mult < 1 ? 0.7 : 1;
-    const s = effPower * mult * weatherMult * typeWeight * accFactor * personality.dmgWeight;
+    // Combo-building bonus: AI prefers same-type moves to build its own combos
+    const comboBuildBonus = battle.fCombo && battle.fCombo.length >= 1 && mv.type === battle.fCombo[battle.fCombo.length - 1] ? 1.15 : 1;
+    const s = effPower * mult * weatherMult * typeWeight * accFactor * personality.dmgWeight * comboBuildBonus;
     if (s > bScore) { bScore = s; best = mv; }
   });
   return { kind: "move", move: best || f.moves[0] };
@@ -1418,6 +1483,15 @@ async function resolveTurn(pAct, aiAct) {
 
     if (atk.fainted || def.fainted) continue;
 
+    const turnPassive = getPassive(atk.type);
+    if (turnPassive && turnPassive.onTurnStart && !atk.fainted) {
+      const healed = turnPassive.onTurnStart(atk);
+      if (healed > 0) {
+        logLines.push(`${atk.name}'s ${turnPassive.icon} ${turnPassive.name} restored ${healed} HP.`);
+        renderBattle(false);
+      }
+    }
+
     if (atk.statusSkipTurns > 0) {
       logLines.push(`${atk.name} is frozen solid and can't move!`);
       atk.statusSkipTurns--;
@@ -1457,6 +1531,14 @@ async function resolveTurn(pAct, aiAct) {
 
     const mv = side === "p" ? pAct.move : aiAct.move;
 
+    const dodgePassive = getPassive(def.type);
+    if (dodgePassive && dodgePassive.onDefend && !def.fainted && dodgePassive.onDefend(def)) {
+      logLines.push(`${def.name} evaded the attack with ${dodgePassive.icon} ${dodgePassive.name}!`);
+      updateLog();
+      if (i < order.length - 1) await delay(1800);
+      continue;
+    }
+
     if (mv.type !== "neutral" && Math.random() * 100 > mv.acc) {
       logLines.push(`${atk.name} used ${mv.name} but missed!`);
       updateLog();
@@ -1494,6 +1576,7 @@ async function resolveTurn(pAct, aiAct) {
       }
       logLines.push(`${def.name} hung on using Steadfast Sash!`);
     }
+    def._lastDmg = dmg;
     def.hp = Math.max(0, def.hp - dmg);
 
     let dmgLog = `${atk.name} used ${mv.name} for ${dmg} damage.`;
@@ -1542,6 +1625,20 @@ async function resolveTurn(pAct, aiAct) {
       dmgFloat.style.top = (defRect.top - arenaRect.top + 10) + "px";
       arena.appendChild(dmgFloat);
       setTimeout(() => dmgFloat.remove(), 1000);
+    }
+
+    const defPassive = getPassive(def.type);
+    if (defPassive && defPassive.onHit && !def.fainted) {
+      const pResult = defPassive.onHit(def, atk);
+      if (typeof pResult === "number" && pResult > 0) {
+        logLines.push(`<b>${def.name}'s ${defPassive.icon} ${defPassive.name}</b> reflected <b>${pResult}</b> damage back!`);
+        if (atk.hp <= 0) { atk.fainted = true; logLines.push(`<b>${atk.name} was knocked out by reflected damage!</b>`); }
+        renderBattle(false);
+        if (atk.fainted) break;
+      } else if (pResult === true) {
+        logLines.push(`<b>${atk.name} was burned by ${def.name}'s ${defPassive.icon} ${defPassive.name}!</b>`);
+        renderBattle(false);
+      }
     }
 
     if (!def.fainted && def.hp > 0 && def.hp / def.baseHp <= 0.25 && def.item === "vitalberry" && !def.itemUsed) {
@@ -1663,6 +1760,8 @@ function startPrepWithData(playerUids, oppIds, aiLvl, trainer, oppRank) {
       m.effDef = Math.round(m.def * (m.item === "ironscale" ? 1.15 : 1));
       m.hp = m.baseHp; m.itemUsed = false; m.fainted = false;
       m.statusEffects = []; m.statusAtkMult = 1; m.statusSkipTurns = 0;
+      m._baseSpd = m.spd; m._baseDef = m.def;
+      triggerPassiveOnInit(m);
       return m;
     }),
     foe: oppIds.map(id => instantiateFoe(id, aiLvl)),
@@ -1683,7 +1782,7 @@ function startPrepWithData(playerUids, oppIds, aiLvl, trainer, oppRank) {
 
   document.getElementById("prep-player-slots").innerHTML = "";
   document.getElementById("prep-foe-slots").innerHTML = "";
-  battle.player.forEach((m, i) => document.getElementById("prep-player-slots").insertAdjacentHTML("beforeend", `<div class="prep-slot ${i === 0 ? 'lead' : ''}"><div class="n">${i + 1}</div><div class="nm">${m.name}</div></div>`));
+  battle.player.forEach((m, i) => document.getElementById("prep-player-slots").insertAdjacentHTML("beforeend", `<div class="prep-slot ${i === 0 ? 'lead' : ''}"><div class="n">${i + 1}</div><div class="nm">${m.name} ${m.passiveIcon || ''}</div></div>`));
   battle.foe.forEach((m, i) => document.getElementById("prep-foe-slots").insertAdjacentHTML("beforeend", `<div class="prep-slot ${i === 0 ? 'lead' : ''} hidden"><div class="n">${i + 1}</div><div class="nm">???</div></div>`));
   document.getElementById("prep-foe-name").textContent = battle.opponentName + (oppRank ? ` (${oppRank})` : "");
   show("screen-prep");
