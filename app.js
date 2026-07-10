@@ -66,6 +66,194 @@ const TYPE_CHART = {
 };
 function typeMultiplier(atkType, defType) { return (atkType === "neutral") ? 1 : ((TYPE_CHART[atkType] && TYPE_CHART[atkType][defType]) || 1); }
 
+const PASSIVE_ABILITIES = {
+  ember: { name:"Blaze", icon:"🔥", desc:"15% chance to burn attackers when hit", 
+    onHit(owner, attacker) { if (Math.random() < 0.15 && !owner.fainted) { applyStatus(attacker, "burn"); return true; } return false; },
+    getEvoDesc:(lvl)=>`${Math.min(35, 15 + Math.floor(lvl/3))}% chance to burn attackers` },
+  aqua: { name:"Tide", icon:"🌊", desc:"Heal 5% max HP at start of each turn",
+    onTurnStart(owner) { if (!owner.fainted && owner.hp < owner.baseHp) { const pct = 0.05 + (owner.level||1) * 0.002; const amt = Math.max(1, Math.floor(owner.baseHp * Math.min(0.12, pct))); owner.hp = Math.min(owner.baseHp, owner.hp + amt); return amt; } return 0; },
+    getEvoDesc:(lvl)=>`Heal ${Math.min(12, 5 + Math.floor(lvl/2))}% max HP each turn` },
+  verdant: { name:"Thorns", icon:"🌿", desc:"Reflect 20% of damage back to attacker",
+    onHit(owner, attacker) { if (!owner.fainted && !attacker.fainted) { const reflectPct = 0.20 + (owner.level||1) * 0.003; const reflect = Math.max(1, Math.floor(owner._lastDmg * Math.min(0.4, reflectPct))); attacker.hp = Math.max(0, attacker.hp - reflect); return reflect; } return 0; },
+    getEvoDesc:(lvl)=>`Reflect ${Math.min(40, 20 + Math.floor(lvl/2))}% damage back` },
+  volt: { name:"Static", icon:"⚡", desc:"+15% Speed in battle", 
+    onInit(owner) { const boost = 1.15 + (owner.level||1) * 0.003; owner.spd = Math.floor(owner._baseSpd * Math.min(1.35, boost)); },
+    getEvoDesc:(lvl)=>`+${Math.min(35, 15 + Math.floor(lvl/2))}% Speed in battle` },
+  stone: { name:"Fortify", icon:"🪨", desc:"+15% Defense in battle",
+    onInit(owner) { const boost = 1.15 + (owner.level||1) * 0.003; owner.effDef = Math.floor(owner._baseDef * Math.min(1.35, boost)); },
+    getEvoDesc:(lvl)=>`+${Math.min(35, 15 + Math.floor(lvl/2))}% Defense in battle` },
+  gale: { name:"Evasion", icon:"💨", desc:"10% chance to dodge attacks",
+    onDefend(owner) { const chance = 0.10 + (owner.level||1) * 0.002; return Math.random() < Math.min(0.25, chance); },
+    getEvoDesc:(lvl)=>`${Math.min(25, 10 + Math.floor(lvl/2))}% chance to dodge attacks` }
+};
+function getPassive(type) { return PASSIVE_ABILITIES[type] || null; }
+function triggerPassiveOnInit(mon) {
+  const p = getPassive(mon.type);
+  if (p && p.onInit) p.onInit(mon);
+  mon.passive = p ? p.name : null;
+  mon.passiveIcon = p ? p.icon : null;
+  mon.passiveDesc = p && p.getEvoDesc ? p.getEvoDesc(mon.level||1) : (p ? p.desc : null);
+}
+function triggerPassiveOnTurnStart(mon, logLines) {
+  const p = getPassive(mon.type);
+  if (p && p.onTurnStart && !mon.fainted) {
+    const healed = p.onTurnStart(mon);
+    if (healed > 0) {
+      logLines.push(`<b>${mon.name}</b>'s ${p.icon} ${p.name} restored <b>${healed}</b> HP.`);
+      return true;
+    }
+  }
+  return false;
+}
+function triggerPassiveOnHit(defender, attacker, logLines) {
+  const p = getPassive(defender.type);
+  if (p && p.onHit && !defender.fainted) {
+    const result = p.onHit(defender, attacker);
+    if (typeof result === "number" && result > 0) {
+      logLines.push(`<b>${defender.name}</b>'s ${p.icon} ${p.name} reflected <b>${result}</b> damage back!`);
+      if (attacker.hp <= 0) { attacker.fainted = true; logLines.push(`<b>${attacker.name}</b> was knocked out by reflected damage!`); }
+      return true;
+    } else if (result === true) {
+      logLines.push(`<b>${attacker.name}</b> was burned by <b>${defender.name}</b>'s ${p.icon} ${p.name}!`);
+      return true;
+    }
+  }
+  return false;
+}
+function triggerPassiveOnDefend(defender) {
+  const p = getPassive(defender.type);
+  return p && p.onDefend && !defender.fainted && p.onDefend(defender);
+}
+
+const ELEMENTAL_COMBOS = {
+  "gale_ember": { name:"Firestorm", icon:"🌪️🔥", desc:"Bonus fire damage from wind-fanning", mult:1.5, effect:"dmgBoost", dur:"once" },
+  "volt_aqua": { name:"Thunderstorm", icon:"⚡🌊", desc:"Stunning bolt through water", mult:1.4, effect:"stun", dur:"once" },
+  "ember_stone": { name:"Magma Eruption", icon:"🔥🪨", desc:"Molten rock smash", mult:1.5, effect:"dmgBoost", dur:"once" },
+  "stone_verdant": { name:"Overgrowth", icon:"🪨🌿", desc:"Life springs from stone", mult:0.15, effect:"heal", dur:"once" },
+  "volt_gale": { name:"Tempest", icon:"⚡💨", desc:"Electrified winds batter the foe", mult:0.5, effect:"spdDmg", dur:"once" },
+  "verdant_aqua": { name:"Bloom", icon:"🌿🌊", desc:"Nourishing waters heal the team", mult:0.1, effect:"teamHeal", dur:"once" },
+  "ember_aqua_verdant": { name:"Seasonal Cycle", icon:"🔥🌊🌿", desc:"Nature's wrath reduces ATK", mult:2.0, effect:"atkDebuff", dur:"once" },
+  "stone_gale_volt": { name:"Cataclysm", icon:"🪨💨⚡", desc:"Tectonic fury reduces DEF", mult:2.0, effect:"defDebuff", dur:"once" }
+};
+
+function checkAndApplyCombo(side, attacker, defender, mv, dmg, logLines, arena) {
+  const tracker = side === "p" ? battle.pCombo : battle.fCombo;
+  tracker.push(mv.type);
+  if (tracker.length > 3) tracker.shift();
+  const comboApplied = { active: false, name: "", icon: "", desc: "", bonusDmg: 0 };
+
+  for (let len = 3; len >= 2; len--) {
+    if (tracker.length < len) continue;
+    const seq = tracker.slice(tracker.length - len);
+    const key = seq.join("_");
+    const combo = ELEMENTAL_COMBOS[key];
+    if (!combo) continue;
+
+    comboApplied.active = true;
+    comboApplied.name = combo.name;
+    comboApplied.icon = combo.icon;
+    comboApplied.desc = combo.desc;
+
+    if (combo.effect === "dmgBoost") {
+      const bonus = Math.round(dmg * (combo.mult - 1));
+      defender.hp = Math.max(0, defender.hp - bonus);
+      if (arena) {
+        const defEl = document.getElementById(side === "p" ? "foe-mon" : "player-mon");
+        if (defEl) {
+          const hf = document.createElement("div");
+          hf.className = "dmg-float combo"; hf.textContent = `${combo.icon} ${bonus}`;
+          const dRect = defEl.getBoundingClientRect(), aRect = arena.getBoundingClientRect();
+          hf.style.left = (dRect.left - aRect.left + dRect.width / 2 - 25) + "px";
+          hf.style.top = (dRect.top - aRect.top - 25) + "px";
+          arena.appendChild(hf);
+          setTimeout(() => hf.remove(), 1200);
+        }
+      }
+      comboApplied.bonusDmg = bonus;
+    } else if (combo.effect === "stun") {
+      if (!defender.statusEffects || defender.statusEffects.length === 0) {
+        applyStatus(defender, "freeze");
+        const defEl2 = document.getElementById(side === "p" ? "foe-mon" : "player-mon");
+        if (defEl2) { defEl2.classList.remove("status-applied"); void defEl2.offsetWidth; defEl2.classList.add("status-applied"); }
+      }
+    } else if (combo.effect === "heal") {
+      const healAmt = Math.round(attacker.baseHp * combo.mult);
+      attacker.hp = Math.min(attacker.baseHp, attacker.hp + healAmt);
+      if (arena) {
+        const atkEl = document.getElementById(side === "p" ? "player-mon" : "foe-mon");
+        if (atkEl) {
+          const hf = document.createElement("div");
+          hf.className = "dmg-float heal"; hf.textContent = `+${healAmt}`;
+          const tRect = atkEl.getBoundingClientRect(), aRect = arena.getBoundingClientRect();
+          hf.style.left = (tRect.left - aRect.left + tRect.width / 2 - 15) + "px";
+          hf.style.top = (tRect.top - aRect.top - 5) + "px";
+          arena.appendChild(hf);
+          setTimeout(() => hf.remove(), 1000);
+        }
+      }
+    } else if (combo.effect === "teamHeal") {
+      const team = side === "p" ? battle.player : battle.foe;
+      team.forEach(m => {
+        if (!m.fainted) {
+          m.hp = Math.min(m.baseHp, m.hp + Math.round(m.baseHp * combo.mult));
+        }
+      });
+    } else if (combo.effect === "spdDmg") {
+      const spdBonus = Math.round(attacker.spd * combo.mult);
+      defender.hp = Math.max(0, defender.hp - spdBonus);
+      comboApplied.bonusDmg = spdBonus;
+      if (arena) {
+        const defEl3 = document.getElementById(side === "p" ? "foe-mon" : "player-mon");
+        if (defEl3) {
+          const hf = document.createElement("div");
+          hf.className = "dmg-float combo"; hf.textContent = `${combo.icon} ${spdBonus}`;
+          const dRect = defEl3.getBoundingClientRect(), aRect = arena.getBoundingClientRect();
+          hf.style.left = (dRect.left - aRect.left + dRect.width / 2 - 25) + "px";
+          hf.style.top = (dRect.top - aRect.top - 25) + "px";
+          arena.appendChild(hf);
+          setTimeout(() => hf.remove(), 1200);
+        }
+      }
+    } else if (combo.effect === "atkDebuff") {
+      defender.statusAtkMult = (defender.statusAtkMult || 1) * 0.75;
+    } else if (combo.effect === "defDebuff") {
+      const defDmg = Math.round(dmg * (combo.mult - 1));
+      defender.hp = Math.max(0, defender.hp - defDmg);
+      comboApplied.bonusDmg = defDmg;
+      if (arena) {
+        const defEl4 = document.getElementById(side === "p" ? "foe-mon" : "player-mon");
+        if (defEl4) {
+          const hf = document.createElement("div");
+          hf.className = "dmg-float combo"; hf.textContent = `${combo.icon} ${defDmg}`;
+          const dRect = defEl4.getBoundingClientRect(), aRect = arena.getBoundingClientRect();
+          hf.style.left = (dRect.left - aRect.left + dRect.width / 2 - 25) + "px";
+          hf.style.top = (dRect.top - aRect.top - 25) + "px";
+          arena.appendChild(hf);
+          setTimeout(() => hf.remove(), 1200);
+        }
+      }
+    }
+
+    tracker._lastCombo = combo.name;
+    break;
+  }
+
+  return comboApplied;
+}
+
+function updateComboUI() {
+  const el = document.getElementById("combo-tracker");
+  if (!el) return;
+  const pCombo = battle.pCombo || [];
+  const fCombo = battle.fCombo || [];
+  let html = "";
+  const seqP = pCombo.slice(-3).join(" → ").toUpperCase();
+  const seqF = fCombo.slice(-3).join(" → ").toUpperCase();
+  if (seqP) html += `<div class="combo-side"><span class="combo-label">YOUR CHAIN:</span> <span class="combo-seq">${seqP}</span></div>`;
+  if (seqF) html += `<div class="combo-side"><span class="combo-label">FOE CHAIN:</span> <span class="combo-seq">${seqF}</span></div>`;
+  el.innerHTML = html;
+}
+
 /* ============================= STATUS EFFECTS & WEATHER ============================= */
 const STATUS_EFFECTS = {
   burn: {
@@ -366,15 +554,17 @@ function getMonData(uid) {
   const evoLevel = def[10] || 0;
   const evoName = def[11] || "";
   const evolved = mSave.evolved || false;
-  const displayName = evolved ? evoName : (variantDef ? variantDef.icon + " " + variantDef.name + " " + def[1] : def[1]);
+  const displayName = evolved ? (variantDef ? variantDef.icon + " " + variantDef.name + " " + evoName : evoName) : (variantDef ? variantDef.icon + " " + variantDef.name + " " + def[1] : def[1]);
   const displayType = variantDef && variantDef.typeOverride ? variantDef.typeOverride : def[2];
+
+  const evoMult = evolved ? 1.25 : 1;
 
   return {
     uid: mSave.uid, baseId: def[0], name: displayName, type: displayType,
-    baseHp: Math.floor(def[3] * scale * hpBonus * vMod.hp),
-    atk: Math.floor(def[4] * scale * atkBonus * vMod.atk),
-    def: Math.floor(def[5] * scale * defBonus * vMod.def),
-    spd: Math.floor(def[6] * scale * spdBonus * vMod.spd),
+    baseHp: Math.floor(def[3] * scale * hpBonus * vMod.hp * evoMult),
+    atk: Math.floor(def[4] * scale * atkBonus * vMod.atk * evoMult),
+    def: Math.floor(def[5] * scale * defBonus * vMod.def * evoMult),
+    spd: Math.floor(def[6] * scale * spdBonus * vMod.spd * evoMult),
     item: mSave.heldItem, sigName: def[8], shape: def[9],
     level: lvl, xp: mSave.xp, onExpedition: mSave.onExpedition,
     maxXp: getMonMaxXp(lvl),
@@ -630,15 +820,18 @@ function buildRosterView() {
     const card = document.createElement("div");
     card.className = "cmon-card " + (m.onExpedition ? "locked" : "");
     const vBadge = m.variant ? `<span class="var-badge var-${m.variant}">${m.variantDef.icon}</span>` : "";
+    const passive = getPassive(m.type);
+    const evoTag = m.evolved ? `<span class="evo-badge">✦</span>` : "";
     card.innerHTML = `
       <div class="row1">
-        <div class="orb t-${m.type}"><div class="glyph"></div></div>
+        <div class="orb t-${m.type} ${m.evolved ? 'evo-orb-glow' : ''}"><div class="glyph"></div></div>
         <div style="flex:1;">
-          <div class="name">${vBadge}${m.name} <span class="badge">Lv.${m.level}</span></div>
-          <div class="type">${m.type} ${m.onExpedition ? '(Exploring)' : ''} ${m.variant ? m.variantDef.name : ''}</div>
+          <div class="name">${vBadge}${evoTag}${m.name} <span class="badge">Lv.${m.level}</span></div>
+          <div class="type">${m.type}${passive ? ` · ${passive.icon} ${passive.name}` : ''} ${m.onExpedition ? '(Exploring)' : ''} ${m.variant ? m.variantDef.name : ''}</div>
         </div>
       </div>
       <div class="xp-bar" style="width:100%; margin-top:4px;"><div class="xp-fill" style="width:${(m.xp / m.maxXp) * 100}%"></div></div>
+      ${passive && m.passiveDesc ? `<div class="passive-desc" style="font-size:10px;color:var(--text-dim);margin-top:2px;">${passive.icon} ${m.passiveDesc}</div>` : ''}
     `;
     card.addEventListener("click", () => showMonDetails(m));
     grid.appendChild(card);
@@ -658,9 +851,11 @@ function showMonDetails(m) {
     </div>`;
 
   const vTag = m.variant ? `<div class="var-badge var-${m.variant}" style="display:inline-block; font-size:13px; padding:2px 10px;">${m.variantDef.icon} ${m.variantDef.name}</div>` : "";
+  const evoTag = m.evolved ? `<span class="evo-badge-lg">✦ EVOLVED</span>` : "";
   view.innerHTML = `
-    <div class="orb mon-big-orb t-${m.type}"><div class="glyph"></div></div>
-    <div style="text-align:center; font-family:var(--display); font-weight:800; font-size:22px;">${vTag} ${m.name} <span class="badge">Lv.${m.level}</span></div>
+    <div class="orb mon-big-orb t-${m.type} ${m.evolved ? 'evo-orb-glow' : ''}"><div class="glyph"></div></div>
+    <div style="text-align:center; font-family:var(--display); font-weight:800; font-size:22px;">${vTag} ${m.name} <span class="badge">Lv.${m.level}</span> ${evoTag}</div>
+    ${m.evolved ? `<div style="text-align:center; font-size:11px; color:var(--gold);">✦ Evolution Bonus: +25% All Stats</div>` : (m.evolvesAt > 0 ? `<div style="text-align:center; font-size:11px; color:var(--text-dim);">Evolves at Lv.${m.evolvesAt} → ${m.evoName} (+25% all stats)</div>` : '')}
     
     <div style="display:flex; flex-direction:column; gap:8px; margin-top:10px;">
       ${drawStat("HP", m.baseHp, 300)}
@@ -672,6 +867,7 @@ function showMonDetails(m) {
     <div style="font-size:12px; color:var(--text-dim); text-align:center; margin-top:10px;">
       Held item: ${ITEMS[m.item].name} — ${ITEMS[m.item].desc}
     </div>
+    ${m.evolved ? `<div style="font-size:11px; color:var(--gold-dim); text-align:center; margin-top:6px;">✦ Evolution Passive Boost: ${m.passiveDesc || (getPassive(m.type) ? getPassive(m.type).desc : '')}</div>` : (() => { const pa = getPassive(m.type); return pa ? `<div style="font-size:11px; color:var(--xp-blue); text-align:center; margin-top:6px;">${pa.icon} Passive: ${pa.name} — ${m.passiveDesc || pa.desc}</div>` : ""; })()}
     
     <button class="btn gold" id="btn-lvlup" style="margin-top:10px;" ${m.onExpedition ? 'disabled' : ''}>Level Up (${formatNum(upgCost)} Gold)</button>
     ${(!m.evolved && m.evolvesAt > 0 && m.level >= m.evolvesAt) ? `<button class="btn gold" id="btn-evolve" style="margin-top:8px; background:linear-gradient(135deg, #c084fc, #8b5cf6); color:white; border:none;">✨ Evolve to ${m.evoName} (FREE)</button>` : ''}
@@ -682,24 +878,134 @@ function showMonDetails(m) {
   document.getElementById("btn-lvlup").onclick = () => {
     if (save.gold < upgCost) return alert("Not enough gold.");
     save.gold -= upgCost;
-    save.mons.find(x => x.uid === m.uid).level++;
+    const mSave = save.mons.find(x => x.uid === m.uid);
+    mSave.level++;
     if (typeof trackQuestProgress === "function") trackQuestProgress("level_up", 1);
-    saveGame(); refreshHome(); showMonDetails(getMonData(m.uid));
+    saveGame();
+    const updated = getMonData(m.uid);
+    if (!mSave.evolved && updated.evolvesAt > 0 && mSave.level >= updated.evolvesAt) {
+      showEvolutionPrompt(updated);
+    } else {
+      refreshHome();
+      showMonDetails(updated);
+    }
   };
 
   const evolveBtn = document.getElementById("btn-evolve");
   if (evolveBtn) {
     evolveBtn.onclick = () => {
-      const mSave = save.mons.find(x => x.uid === m.uid);
-      if (!mSave || mSave.evolved) return;
-      mSave.evolved = true;
-      saveGame();
-      const evolved = getMonData(m.uid);
-      alert(`✨ ${m.name} evolved into ${evolved.name}! All stats increased!`);
-      refreshHome();
-      showMonDetails(evolved);
+      performEvolution(m.uid);
     };
   }
+}
+
+/* ============================= EVOLUTION SYSTEM ============================= */
+function performEvolution(uid) {
+  const mSave = save.mons.find(x => x.uid === uid);
+  if (!mSave || mSave.evolved) return;
+  const oldName = getMonData(uid).name;
+
+  showEvolutionAnimation(uid, () => {
+    mSave.evolved = true;
+    saveGame();
+    const evolved = getMonData(uid);
+    const oldView = document.getElementById("mon-details-view");
+    if (oldView) {
+      showMonDetails(evolved);
+    }
+    refreshHome();
+  });
+}
+
+function showEvolutionAnimation(uid, callback) {
+  const m = getMonData(uid);
+  const overlay = document.createElement("div");
+  overlay.id = "evo-overlay";
+  overlay.innerHTML = `
+    <div class="evo-container">
+      <div class="evo-orb t-${m.type} ${m.shape}">
+        <div class="evo-glow"></div>
+        <div class="evo-face"><div class="eye l"></div><div class="eye r"></div></div>
+      </div>
+      <div class="evo-name">${m.name}</div>
+      <div class="evo-label">is evolving...</div>
+      <div class="evo-bars">
+        <div class="evo-bar-row"><span class="evo-bar-label">HP</span><div class="evo-bar-track"><div class="evo-bar-fill" style="width:70%"></div></div></div>
+        <div class="evo-bar-row"><span class="evo-bar-label">ATK</span><div class="evo-bar-track"><div class="evo-bar-fill" style="width:70%"></div></div></div>
+        <div class="evo-bar-row"><span class="evo-bar-label">DEF</span><div class="evo-bar-track"><div class="evo-bar-fill" style="width:70%"></div></div></div>
+        <div class="evo-bar-row"><span class="evo-bar-label">SPD</span><div class="evo-bar-track"><div class="evo-bar-fill" style="width:70%"></div></div></div>
+      </div>
+    </div>
+  `;
+  document.getElementById("app").appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add("evo-active"));
+
+  const evoName = m.evoName || m.name;
+  const duration = 2500;
+  const startTime = Date.now();
+
+  function animStep() {
+    const elapsed = Date.now() - startTime;
+    const progress = Math.min(1, elapsed / duration);
+    const bars = overlay.querySelectorAll(".evo-bar-fill");
+    const orb = overlay.querySelector(".evo-orb");
+    const label = overlay.querySelector(".evo-label");
+
+    bars.forEach(bar => {
+      const currentW = 70 + progress * 25;
+      bar.style.width = Math.min(95, currentW) + "%";
+    });
+
+    if (progress > 0.5) {
+      orb.className = "evo-orb evo-evolved t-" + m.type + " " + m.shape;
+      label.textContent = "evolved into " + evoName + "!";
+    }
+
+    if (progress < 1) {
+      requestAnimationFrame(animStep);
+    } else {
+      setTimeout(() => {
+        overlay.classList.remove("evo-active");
+        overlay.classList.add("evo-fadeout");
+        setTimeout(() => overlay.remove(), 600);
+        if (callback) callback();
+      }, 500);
+    }
+  }
+
+  requestAnimationFrame(animStep);
+}
+
+function showEvolutionPrompt(m) {
+  const overlay = document.createElement("div");
+  overlay.id = "evo-prompt-overlay";
+  overlay.innerHTML = `
+    <div class="evo-prompt">
+      <div class="evo-prompt-orb t-${m.type} ${m.shape}"><div class="face"><div class="eye l"></div><div class="eye r"></div></div></div>
+      <div class="evo-prompt-title">Evolution Available!</div>
+      <div class="evo-prompt-desc">${m.name} has reached Lv.${m.level} and is ready to evolve into <strong>${m.evoName}</strong>!</div>
+      <div class="evo-prompt-stats">
+        <div>✦ All stats +25%</div>
+        <div>✦ Enhanced passive ability</div>
+        <div>✦ New visual form</div>
+      </div>
+      <div class="evo-prompt-btns">
+        <button class="btn gold" id="btn-evolve-prompt-yes">✨ Evolve Now</button>
+        <button class="btn ghost" id="btn-evolve-prompt-later">Later</button>
+      </div>
+    </div>
+  `;
+  document.getElementById("app").appendChild(overlay);
+
+  document.getElementById("btn-evolve-prompt-yes").onclick = () => {
+    overlay.remove();
+    performEvolution(m.uid);
+  };
+  document.getElementById("btn-evolve-prompt-later").onclick = () => {
+    overlay.remove();
+    refreshHome();
+    showMonDetails(m);
+  };
 }
 
 /* ============================= TEAM SELECT ============================= */
@@ -723,11 +1029,13 @@ function buildSelectGrid() {
     const m = getMonData(mSave.uid);
     const card = document.createElement("div");
     card.className = "cmon-card"; card.dataset.uid = m.uid;
+    const passive = getPassive(m.type);
     card.innerHTML = `
       <div class="pickbadge" style="display:none;"></div>
       <div class="row1"><div class="orb t-${m.type}"><div class="glyph"></div></div>
-      <div><div class="name">${m.name} <span class="badge">Lv.${m.level}</span></div><div class="type">${m.type}</div></div></div>
+      <div><div class="name">${m.name} <span class="badge">Lv.${m.level}</span></div><div class="type">${m.type}${passive ? ` ${passive.icon}` : ''}</div></div></div>
       <div class="stats">${statLine(m)}</div>
+      ${m.passiveDesc ? `<div class="passive-desc" style="font-size:10px;color:var(--text-dim);margin-top:2px;">${m.passiveIcon} ${m.passiveDesc}</div>` : ''}
     `;
     card.onclick = () => togglePick(m.uid, card);
     grid.appendChild(card);
@@ -1052,6 +1360,8 @@ function startTourneyMatch(matchIdx) {
     m.effDef = Math.round(m.def * (m.item === "ironscale" ? 1.15 : 1));
     m.hp = m.baseHp; m.itemUsed = false; m.fainted = false;
     m.statusEffects = []; m.statusAtkMult = 1; m.statusSkipTurns = 0;
+    m._baseSpd = m.spd; m._baseDef = m.def;
+    triggerPassiveOnInit(m);
     return m;
   });
 
@@ -1064,7 +1374,8 @@ function startTourneyMatch(matchIdx) {
     opponentName: aiOpp.trainer.name,
     personality: aiOpp.trainer.personality,
     over: false,
-    tournament: { matchIdx: matchIdx }
+    tournament: { matchIdx: matchIdx },
+    pCombo: [], fCombo: []
   };
 
   const weatherKeys = Object.keys(WEATHER_CONDITIONS).filter(k => k !== "none");
@@ -1077,7 +1388,11 @@ function startTourneyMatch(matchIdx) {
 
   document.getElementById("prep-player-slots").innerHTML = "";
   document.getElementById("prep-foe-slots").innerHTML = "";
-  battle.player.forEach((m, i) => document.getElementById("prep-player-slots").insertAdjacentHTML("beforeend", `<div class="prep-slot ${i === 0 ? 'lead' : ''}"><div class="n">${i + 1}</div><div class="nm">${m.name}</div></div>`));
+  battle.player.forEach((m, i) => {
+    const passiveHtml = m.passive ? `<span class="passive-prep" title="${m.passive}: ${m.passiveDesc || ''}">${m.passiveIcon}</span>` : '';
+    document.getElementById("prep-player-slots").insertAdjacentHTML("beforeend",
+      `<div class="prep-slot ${i === 0 ? 'lead' : ''}"><div class="n">${i + 1}</div><div class="nm">${m.name} ${passiveHtml}</div></div>`);
+  });
   battle.foe.forEach((m, i) => document.getElementById("prep-foe-slots").insertAdjacentHTML("beforeend", `<div class="prep-slot ${i === 0 ? 'lead' : ''} hidden"><div class="n">${i + 1}</div><div class="nm">???</div></div>`));
   document.getElementById("prep-foe-name").textContent = aiOpp.trainer.name;
 
@@ -1109,9 +1424,11 @@ function instantiateFoe(baseId, lvl) {
     def: Math.floor(def[5] * scale), spd: Math.floor(def[6] * scale),
     moves: [BASH, MOVES[def[2]], move(def[8], def[2], 80, 85)], shape: def[9]
   };
+  m._baseSpd = m.spd; m._baseDef = m.def;
   m.effDef = Math.round(m.def * (m.item === "ironscale" ? 1.15 : 1));
   m.hp = m.baseHp; m.itemUsed = false; m.fainted = false;
   m.statusEffects = []; m.statusAtkMult = 1; m.statusSkipTurns = 0;
+  triggerPassiveOnInit(m);
   return m;
 }
 
@@ -1125,7 +1442,15 @@ if (document.getElementById("btn-skip-prep")) document.getElementById("btn-skip-
 
 function revealFoeAndBattle() {
   document.querySelectorAll("#prep-foe-slots .prep-slot").forEach((el, i) => { el.classList.remove("hidden"); el.querySelector(".nm").textContent = battle.foe[i].name; });
-  setTimeout(() => { show("screen-battle"); document.getElementById("battle-log").textContent = `Tier ${save.tierLevel} match against ${battle.opponentName} has begun!`; renderBattle(true); }, 500);
+  setTimeout(() => {
+    show("screen-battle");
+    const p = activePlayer(), f = activeFoe();
+    let log = `Tier ${save.tierLevel} match against ${battle.opponentName} has begun!`;
+    if (p.passive) log += `<br>Your ${p.name}'s ${p.passiveIcon} ${p.passive} is active.`;
+    if (f.passive) log += `<br>Foe ${f.name}'s ${f.passiveIcon} ${f.passive} is active.`;
+    document.getElementById("battle-log").innerHTML = log;
+    renderBattle(true);
+  }, 500);
 }
 
 function activePlayer() { return battle.player[battle.pIndex]; }
@@ -1164,11 +1489,11 @@ function renderBattle(fullRebuild) {
 
   const pStatusEl = document.getElementById("ally-status");
   const fStatusEl = document.getElementById("foe-status");
-  if (pStatusEl) pStatusEl.innerHTML = (p.statusEffects || []).map(k => `<span style="color:${STATUS_EFFECTS[k].color}">${STATUS_EFFECTS[k].icon}</span>`).join(" ");
-  if (fStatusEl) fStatusEl.innerHTML = (f.statusEffects || []).map(k => `<span style="color:${STATUS_EFFECTS[k].color}">${STATUS_EFFECTS[k].icon}</span>`).join(" ");
+  if (pStatusEl) pStatusEl.innerHTML = (p.statusEffects || []).map(k => `<span style="color:${STATUS_EFFECTS[k].color}">${STATUS_EFFECTS[k].icon}</span>`).join(" ") + (p.passive ? `<span title="${p.passive}" style="opacity:0.6;font-size:11px;margin-left:4px;">${p.passiveIcon}</span>` : "");
+  if (fStatusEl) fStatusEl.innerHTML = (f.statusEffects || []).map(k => `<span style="color:${STATUS_EFFECTS[k].color}">${STATUS_EFFECTS[k].icon}</span>`).join(" ") + (f.passive ? `<span title="${f.passive}" style="opacity:0.6;font-size:11px;margin-left:4px;">${f.passiveIcon}</span>` : "");
 
-  const pm = document.getElementById("player-mon"); pm.className = "mon " + p.shape + " t-" + p.type;
-  const fm = document.getElementById("foe-mon"); fm.className = "mon " + f.shape + " t-" + f.type;
+  const pm = document.getElementById("player-mon"); pm.className = "mon " + p.shape + " t-" + p.type + (p.evolved ? " evolved" : "");
+  const fm = document.getElementById("foe-mon"); fm.className = "mon " + f.shape + " t-" + f.type + (f.evolved ? " evolved" : "");
   (p.statusEffects || []).forEach(k => pm.classList.add(k === "freeze" ? "frozen" : k));
   (f.statusEffects || []).forEach(k => fm.classList.add(k === "freeze" ? "frozen" : k));
 
@@ -1210,26 +1535,108 @@ function aiPickAction() {
   const personality = AI_PERSONALITIES[battle.personality] || AI_PERSONALITIES.balanced;
   const aliveFoes = battle.foe.filter(m => !m.fainted);
 
+  /* --- THREAT ASSESSMENT --- */
   const bestPlyrMove = p.moves.reduce((best, mv) => {
     const s = mv.power * typeMultiplier(mv.type, f.type);
     return s > (best?.score || -1) ? { mv, score: s } : best;
   }, null);
   const aiAtDisadvantage = bestPlyrMove && bestPlyrMove.score > 80;
 
-  if (aliveFoes.length > 1 && aiAtDisadvantage && (f.hp / f.baseHp) <= personality.switchBelowHpPct && Math.random() < personality.switchChance) {
-    let bestSwitch = null, bestResist = -1;
-    aliveFoes.forEach(candidate => {
-      if (candidate.uid === f.uid) return;
-      let totalDmg = 0;
-      p.moves.forEach(mv => { totalDmg += mv.power * typeMultiplier(mv.type, candidate.type); });
-      const avgMult = totalDmg / (p.moves.length * 100);
-      const resistScore = 1 - avgMult;
-      if (resistScore > bestResist) { bestResist = resistScore; bestSwitch = candidate; }
-    });
-    if (bestSwitch) return { kind: "switch", index: battle.foe.indexOf(bestSwitch) };
+  /* --- COMBO PREDICTION SYSTEM --- */
+  let comboThreat = false, comboResistType = null, comboScore = 0;
+  if (battle.pCombo && battle.pCombo.length >= 1) {
+    const seq = battle.pCombo;
+    for (const key in ELEMENTAL_COMBOS) {
+      const parts = key.split("_");
+      if (parts.length < seq.length) continue;
+      if (parts.every((t, i) => t === seq[i])) {
+        if (parts.length > seq.length) {
+          const nextType = parts[seq.length];
+          const currentMult = typeMultiplier(nextType, f.type);
+          const worstMult = aliveFoes.reduce((min, m) => Math.min(min, typeMultiplier(nextType, m.type)), 2);
+          if (currentMult > 1 || worstMult < 1) {
+            comboThreat = true;
+            comboResistType = nextType;
+            comboScore = Math.max(comboScore, ELEMENTAL_COMBOS[key].mult || 1);
+          }
+        } else {
+          const combo = ELEMENTAL_COMBOS[key];
+          if (combo) comboScore = Math.max(comboScore, combo.mult || 1);
+        }
+      }
+    }
   }
 
+  /* --- STATUS-AWARE SWITCH CHECK --- */
+  const hasHarmfulStatus = f.statusEffects && f.statusEffects.length > 0 &&
+    (f.statusEffects.includes("burn") || f.statusEffects.includes("poison")) &&
+    (f.hp / f.baseHp) <= 0.5;
+
+  /* --- SWITCH DECISION --- */
+  if (aliveFoes.length > 1) {
+    let shouldSwitch = false;
+    let switchPriority = 0;
+
+    // Combo threat evasion — more aggressive if combo is powerful
+    const comboThreatThreshold = comboScore > 1.8 ? 0.65 : 0.5;
+    if (comboThreat && (f.hp / f.baseHp) <= comboThreatThreshold && personality.dmgWeight >= 1.0) {
+      shouldSwitch = true;
+      switchPriority = 2;
+    }
+
+    // Harmful status — defensive/tactician personalities more likely to switch
+    if (hasHarmfulStatus && personality.switchChance > 0.2 && Math.random() < personality.switchChance) {
+      shouldSwitch = true;
+      switchPriority = Math.max(switchPriority, 1.5);
+    }
+
+    // Standard disadvantage check
+    if (aiAtDisadvantage && (f.hp / f.baseHp) <= personality.switchBelowHpPct && Math.random() < personality.switchChance) {
+      shouldSwitch = true;
+      switchPriority = Math.max(switchPriority, 1);
+    }
+
+    // Reckless personality ignores combo threats
+    if (personality.dmgWeight >= 1.5 && switchPriority < 2) {
+      shouldSwitch = false;
+    }
+
+    if (shouldSwitch) {
+      let bestSwitch = null, bestScore = -1;
+      aliveFoes.forEach(candidate => {
+        if (candidate === f) return;
+        let totalDmg = 0;
+        p.moves.forEach(mv => { totalDmg += mv.power * typeMultiplier(mv.type, candidate.type); });
+        const avgMult = totalDmg / (p.moves.length * 100);
+        let resistScore = 1 - avgMult;
+
+        // Bonus for combo-resistant switch
+        if (comboResistType && typeMultiplier(comboResistType, candidate.type) < 1) {
+          resistScore += 0.3;
+        }
+
+        // Passive synergy bonus — switch to a mon whose passive counters player
+        const candPassive = getPassive(candidate.type);
+        if (candPassive) {
+          if (candPassive.name === "Evasion" && p.atk > p.def) resistScore += 0.1;
+          if (candPassive.name === "Thorns" && p.atk > p.spd) resistScore += 0.1;
+          if (candPassive.name === "Fortify") resistScore += 0.05;
+        }
+
+        // HP bonus — prefer healthier mons
+        const hpRatio = candidate.hp / candidate.baseHp;
+        resistScore += hpRatio * 0.1;
+
+        if (resistScore > bestScore) { bestScore = resistScore; bestSwitch = candidate; }
+      });
+      if (bestSwitch) return { kind: "switch", index: battle.foe.indexOf(bestSwitch) };
+    }
+  }
+
+  /* --- MOVE SELECTION WITH COMBO-BUILDING & FINISHING PRIORITY --- */
   let best = null, bScore = -1;
+  const playerLowHp = (p.hp / p.baseHp) <= 0.3;
+
   f.moves.forEach(mv => {
     const mult = typeMultiplier(mv.type, p.type);
     const weatherMult = getWeatherMult(mv.type, p.type);
@@ -1237,9 +1644,34 @@ function aiPickAction() {
     const stabBonus = mv.type === f.type ? personality.stabBonus : 1;
     const effPower = mv.power * stabBonus;
     const typeWeight = mult > 1 ? 1.3 : mult < 1 ? 0.7 : 1;
-    const s = effPower * mult * weatherMult * typeWeight * accFactor * personality.dmgWeight;
+
+    // Combo-building: AI actively tries to build its own combos
+    let comboBuildBonus = 1;
+    if (battle.fCombo && battle.fCombo.length >= 1) {
+      const seq = battle.fCombo;
+      for (const key in ELEMENTAL_COMBOS) {
+        const parts = key.split("_");
+        if (parts.length > seq.length + 1) continue;
+        if (parts.slice(0, seq.length).every((t, i) => t === seq[i]) && parts[seq.length] === mv.type) {
+          comboBuildBonus = 1.25;
+          break;
+        }
+      }
+      // Continue existing chain bonus
+      if (mv.type === seq[seq.length - 1]) comboBuildBonus = Math.max(comboBuildBonus, 1.15);
+    }
+
+    // Finishing move bonus
+    const finishBonus = playerLowHp && mult > 0 ? 1.2 : 1;
+
+    // Status application bonus — prefer moves that can apply status
+    const statusBonus = (!p.statusEffects || p.statusEffects.length === 0) &&
+      { ember: "burn", aqua: "freeze", volt: "burn", gale: "freeze" }[mv.type] ? 1.1 : 1;
+
+    const s = effPower * mult * weatherMult * typeWeight * accFactor * personality.dmgWeight * comboBuildBonus * finishBonus * statusBonus;
     if (s > bScore) { bScore = s; best = mv; }
   });
+
   return { kind: "move", move: best || f.moves[0] };
 }
 
@@ -1295,6 +1727,8 @@ async function resolveTurn(pAct, aiAct) {
 
     if (atk.fainted || def.fainted) continue;
 
+    if (triggerPassiveOnTurnStart(atk, logLines)) renderBattle(false);
+
     if (atk.statusSkipTurns > 0) {
       logLines.push(`${atk.name} is frozen solid and can't move!`);
       atk.statusSkipTurns--;
@@ -1334,6 +1768,14 @@ async function resolveTurn(pAct, aiAct) {
 
     const mv = side === "p" ? pAct.move : aiAct.move;
 
+    if (triggerPassiveOnDefend(def)) {
+      const dp = getPassive(def.type);
+      logLines.push(`${def.name} evaded the attack with ${dp.icon} ${dp.name}!`);
+      updateLog();
+      if (i < order.length - 1) await delay(1800);
+      continue;
+    }
+
     if (mv.type !== "neutral" && Math.random() * 100 > mv.acc) {
       logLines.push(`${atk.name} used ${mv.name} but missed!`);
       updateLog();
@@ -1371,6 +1813,7 @@ async function resolveTurn(pAct, aiAct) {
       }
       logLines.push(`${def.name} hung on using Steadfast Sash!`);
     }
+    def._lastDmg = dmg;
     def.hp = Math.max(0, def.hp - dmg);
 
     let dmgLog = `${atk.name} used ${mv.name} for ${dmg} damage.`;
@@ -1378,6 +1821,15 @@ async function resolveTurn(pAct, aiAct) {
     if (mult > 1) dmgLog += " <b style='color:var(--gold)'>Super effective!</b>";
     if (weatherMult !== 1) dmgLog += weatherMult > 1 ? " <span style='color:var(--warn)'>Weather boosted!</span>" : " <span style='color:var(--text-dim)'>Weather dampened...</span>";
     logLines.push(dmgLog);
+
+    const comboResult = checkAndApplyCombo(side, atk, def, mv, dmg, logLines, document.getElementById("arena"));
+    if (comboResult.active) {
+      logLines.push(`<b style="color:var(--gold)">✦ ${comboResult.icon} ${comboResult.name}!</b> <span style="color:var(--text-dim)">${comboResult.desc}</span>`);
+      if (comboResult.bonusDmg > 0) {
+        logLines.push(`<span style="color:var(--warn)">Combo bonus: +${comboResult.bonusDmg} extra damage!</span>`);
+      }
+    }
+    updateComboUI();
 
     if (!def.statusEffects || def.statusEffects.length === 0) {
       const statusChance = { ember: 0.2, aqua: 0.2, verdant: 0, volt: 0.2, stone: 0, gale: 0 };
@@ -1410,6 +1862,11 @@ async function resolveTurn(pAct, aiAct) {
       dmgFloat.style.top = (defRect.top - arenaRect.top + 10) + "px";
       arena.appendChild(dmgFloat);
       setTimeout(() => dmgFloat.remove(), 1000);
+    }
+
+    if (triggerPassiveOnHit(def, atk, logLines)) {
+      renderBattle(false);
+      if (atk.fainted) break;
     }
 
     if (!def.fainted && def.hp > 0 && def.hp / def.baseHp <= 0.25 && def.item === "vitalberry" && !def.itemUsed) {
@@ -1531,13 +1988,16 @@ function startPrepWithData(playerUids, oppIds, aiLvl, trainer, oppRank) {
       m.effDef = Math.round(m.def * (m.item === "ironscale" ? 1.15 : 1));
       m.hp = m.baseHp; m.itemUsed = false; m.fainted = false;
       m.statusEffects = []; m.statusAtkMult = 1; m.statusSkipTurns = 0;
+      m._baseSpd = m.spd; m._baseDef = m.def;
+      triggerPassiveOnInit(m);
       return m;
     }),
     foe: oppIds.map(id => instantiateFoe(id, aiLvl)),
     pIndex: 0, fIndex: 0,
     opponentName: trainer.name,
     personality: trainer.personality,
-    over: false
+    over: false,
+    pCombo: [], fCombo: []
   };
 
   const weatherKeys = Object.keys(WEATHER_CONDITIONS).filter(k => k !== "none");
@@ -1550,9 +2010,13 @@ function startPrepWithData(playerUids, oppIds, aiLvl, trainer, oppRank) {
 
   document.getElementById("prep-player-slots").innerHTML = "";
   document.getElementById("prep-foe-slots").innerHTML = "";
-  battle.player.forEach((m, i) => document.getElementById("prep-player-slots").insertAdjacentHTML("beforeend", `<div class="prep-slot ${i === 0 ? 'lead' : ''}"><div class="n">${i + 1}</div><div class="nm">${m.name}</div></div>`));
+  battle.player.forEach((m, i) => {
+    const passiveHtml = m.passive ? `<span class="passive-prep" title="${m.passive}: ${m.passiveDesc || ''}">${m.passiveIcon}</span>` : '';
+    document.getElementById("prep-player-slots").insertAdjacentHTML("beforeend",
+      `<div class="prep-slot ${i === 0 ? 'lead' : ''}"><div class="n">${i + 1}</div><div class="nm">${m.name} ${passiveHtml}</div></div>`);
+  });
   battle.foe.forEach((m, i) => document.getElementById("prep-foe-slots").insertAdjacentHTML("beforeend", `<div class="prep-slot ${i === 0 ? 'lead' : ''} hidden"><div class="n">${i + 1}</div><div class="nm">???</div></div>`));
-  document.getElementById("prep-foe-name").textContent = battle.opponentName + (oppRank ? ` (${oppRank})` : "");
+  document.getElementById("prep-foe-name").textContent = trainer.name + (oppRank ? ` (${oppRank})` : "");
   show("screen-prep");
   runPrepTimer();
 }
