@@ -67,12 +67,24 @@ const TYPE_CHART = {
 function typeMultiplier(atkType, defType) { return (atkType === "neutral") ? 1 : ((TYPE_CHART[atkType] && TYPE_CHART[atkType][defType]) || 1); }
 
 const PASSIVE_ABILITIES = {
-  ember: { name:"Blaze", icon:"🔥", desc:"15% chance to burn attackers when hit", onHit(owner, attacker) { if (Math.random() < 0.15 && !owner.fainted) { applyStatus(attacker, "burn"); return true; } return false; } },
-  aqua: { name:"Tide", icon:"🌊", desc:"Heal 5% max HP at start of each turn", onTurnStart(owner) { if (!owner.fainted && owner.hp < owner.baseHp) { const amt = Math.max(1, Math.floor(owner.baseHp * 0.05)); owner.hp = Math.min(owner.baseHp, owner.hp + amt); return amt; } return 0; } },
-  verdant: { name:"Thorns", icon:"🌿", desc:"Reflect 20% of damage back to attacker", onHit(owner, attacker) { if (!owner.fainted && !attacker.fainted) { const reflect = Math.max(1, Math.floor(owner._lastDmg * 0.2)); attacker.hp = Math.max(0, attacker.hp - reflect); return reflect; } return 0; } },
-  volt: { name:"Static", icon:"⚡", desc:"+15% Speed in battle", onInit(owner) { owner.spd = Math.floor(owner._baseSpd * 1.15); } },
-  stone: { name:"Fortify", icon:"🪨", desc:"+15% Defense in battle", onInit(owner) { owner.effDef = Math.floor(owner._baseDef * 1.15); } },
-  gale: { name:"Evasion", icon:"💨", desc:"10% chance to dodge attacks", onDefend(owner) { return Math.random() < 0.10; } }
+  ember: { name:"Blaze", icon:"🔥", desc:"15% chance to burn attackers when hit", 
+    onHit(owner, attacker) { if (Math.random() < 0.15 && !owner.fainted) { applyStatus(attacker, "burn"); return true; } return false; },
+    getEvoDesc:(lvl)=>`${Math.min(35, 15 + Math.floor(lvl/3))}% chance to burn attackers` },
+  aqua: { name:"Tide", icon:"🌊", desc:"Heal 5% max HP at start of each turn",
+    onTurnStart(owner) { if (!owner.fainted && owner.hp < owner.baseHp) { const pct = 0.05 + (owner.level||1) * 0.002; const amt = Math.max(1, Math.floor(owner.baseHp * Math.min(0.12, pct))); owner.hp = Math.min(owner.baseHp, owner.hp + amt); return amt; } return 0; },
+    getEvoDesc:(lvl)=>`Heal ${Math.min(12, 5 + Math.floor(lvl/2))}% max HP each turn` },
+  verdant: { name:"Thorns", icon:"🌿", desc:"Reflect 20% of damage back to attacker",
+    onHit(owner, attacker) { if (!owner.fainted && !attacker.fainted) { const reflectPct = 0.20 + (owner.level||1) * 0.003; const reflect = Math.max(1, Math.floor(owner._lastDmg * Math.min(0.4, reflectPct))); attacker.hp = Math.max(0, attacker.hp - reflect); return reflect; } return 0; },
+    getEvoDesc:(lvl)=>`Reflect ${Math.min(40, 20 + Math.floor(lvl/2))}% damage back` },
+  volt: { name:"Static", icon:"⚡", desc:"+15% Speed in battle", 
+    onInit(owner) { const boost = 1.15 + (owner.level||1) * 0.003; owner.spd = Math.floor(owner._baseSpd * Math.min(1.35, boost)); },
+    getEvoDesc:(lvl)=>`+${Math.min(35, 15 + Math.floor(lvl/2))}% Speed in battle` },
+  stone: { name:"Fortify", icon:"🪨", desc:"+15% Defense in battle",
+    onInit(owner) { const boost = 1.15 + (owner.level||1) * 0.003; owner.effDef = Math.floor(owner._baseDef * Math.min(1.35, boost)); },
+    getEvoDesc:(lvl)=>`+${Math.min(35, 15 + Math.floor(lvl/2))}% Defense in battle` },
+  gale: { name:"Evasion", icon:"💨", desc:"10% chance to dodge attacks",
+    onDefend(owner) { const chance = 0.10 + (owner.level||1) * 0.002; return Math.random() < Math.min(0.25, chance); },
+    getEvoDesc:(lvl)=>`${Math.min(25, 10 + Math.floor(lvl/2))}% chance to dodge attacks` }
 };
 function getPassive(type) { return PASSIVE_ABILITIES[type] || null; }
 function triggerPassiveOnInit(mon) {
@@ -80,6 +92,37 @@ function triggerPassiveOnInit(mon) {
   if (p && p.onInit) p.onInit(mon);
   mon.passive = p ? p.name : null;
   mon.passiveIcon = p ? p.icon : null;
+  mon.passiveDesc = p && p.getEvoDesc ? p.getEvoDesc(mon.level||1) : (p ? p.desc : null);
+}
+function triggerPassiveOnTurnStart(mon, logLines) {
+  const p = getPassive(mon.type);
+  if (p && p.onTurnStart && !mon.fainted) {
+    const healed = p.onTurnStart(mon);
+    if (healed > 0) {
+      logLines.push(`<b>${mon.name}</b>'s ${p.icon} ${p.name} restored <b>${healed}</b> HP.`);
+      return true;
+    }
+  }
+  return false;
+}
+function triggerPassiveOnHit(defender, attacker, logLines) {
+  const p = getPassive(defender.type);
+  if (p && p.onHit && !defender.fainted) {
+    const result = p.onHit(defender, attacker);
+    if (typeof result === "number" && result > 0) {
+      logLines.push(`<b>${defender.name}</b>'s ${p.icon} ${p.name} reflected <b>${result}</b> damage back!`);
+      if (attacker.hp <= 0) { attacker.fainted = true; logLines.push(`<b>${attacker.name}</b> was knocked out by reflected damage!`); }
+      return true;
+    } else if (result === true) {
+      logLines.push(`<b>${attacker.name}</b> was burned by <b>${defender.name}</b>'s ${p.icon} ${p.name}!`);
+      return true;
+    }
+  }
+  return false;
+}
+function triggerPassiveOnDefend(defender) {
+  const p = getPassive(defender.type);
+  return p && p.onDefend && !defender.fainted && p.onDefend(defender);
 }
 
 const ELEMENTAL_COMBOS = {
@@ -784,6 +827,7 @@ function buildRosterView() {
         </div>
       </div>
       <div class="xp-bar" style="width:100%; margin-top:4px;"><div class="xp-fill" style="width:${(m.xp / m.maxXp) * 100}%"></div></div>
+      ${passive && m.passiveDesc ? `<div class="passive-desc" style="font-size:10px;color:var(--text-dim);margin-top:2px;">${passive.icon} ${m.passiveDesc}</div>` : ''}
     `;
     card.addEventListener("click", () => showMonDetails(m));
     grid.appendChild(card);
@@ -817,7 +861,7 @@ function showMonDetails(m) {
     <div style="font-size:12px; color:var(--text-dim); text-align:center; margin-top:10px;">
       Held item: ${ITEMS[m.item].name} — ${ITEMS[m.item].desc}
     </div>
-    ${(() => { const pa = getPassive(m.type); return pa ? `<div style="font-size:11px; color:var(--xp-blue); text-align:center; margin-top:6px;">${pa.icon} Passive: ${pa.name} — ${pa.desc}</div>` : ""; })()}
+    ${(() => { const pa = getPassive(m.type); return pa ? `<div style="font-size:11px; color:var(--xp-blue); text-align:center; margin-top:6px;">${pa.icon} Passive: ${pa.name} — ${m.passiveDesc || pa.desc}</div>` : ""; })()}
     
     <button class="btn gold" id="btn-lvlup" style="margin-top:10px;" ${m.onExpedition ? 'disabled' : ''}>Level Up (${formatNum(upgCost)} Gold)</button>
     ${(!m.evolved && m.evolvesAt > 0 && m.level >= m.evolvesAt) ? `<button class="btn gold" id="btn-evolve" style="margin-top:8px; background:linear-gradient(135deg, #c084fc, #8b5cf6); color:white; border:none;">✨ Evolve to ${m.evoName} (FREE)</button>` : ''}
@@ -875,6 +919,7 @@ function buildSelectGrid() {
       <div class="row1"><div class="orb t-${m.type}"><div class="glyph"></div></div>
       <div><div class="name">${m.name} <span class="badge">Lv.${m.level}</span></div><div class="type">${m.type}${passive ? ` ${passive.icon}` : ''}</div></div></div>
       <div class="stats">${statLine(m)}</div>
+      ${m.passiveDesc ? `<div class="passive-desc" style="font-size:10px;color:var(--text-dim);margin-top:2px;">${m.passiveIcon} ${m.passiveDesc}</div>` : ''}
     `;
     card.onclick = () => togglePick(m.uid, card);
     grid.appendChild(card);
@@ -1221,7 +1266,11 @@ function startTourneyMatch(matchIdx) {
 
   document.getElementById("prep-player-slots").innerHTML = "";
   document.getElementById("prep-foe-slots").innerHTML = "";
-  battle.player.forEach((m, i) => document.getElementById("prep-player-slots").insertAdjacentHTML("beforeend", `<div class="prep-slot ${i === 0 ? 'lead' : ''}"><div class="n">${i + 1}</div><div class="nm">${m.name} ${m.passiveIcon || ''}</div></div>`));
+  battle.player.forEach((m, i) => {
+    const passiveHtml = m.passive ? `<span class="passive-prep" title="${m.passive}: ${m.passiveDesc || ''}">${m.passiveIcon}</span>` : '';
+    document.getElementById("prep-player-slots").insertAdjacentHTML("beforeend",
+      `<div class="prep-slot ${i === 0 ? 'lead' : ''}"><div class="n">${i + 1}</div><div class="nm">${m.name} ${passiveHtml}</div></div>`);
+  });
   battle.foe.forEach((m, i) => document.getElementById("prep-foe-slots").insertAdjacentHTML("beforeend", `<div class="prep-slot ${i === 0 ? 'lead' : ''} hidden"><div class="n">${i + 1}</div><div class="nm">???</div></div>`));
   document.getElementById("prep-foe-name").textContent = aiOpp.trainer.name;
 
@@ -1271,7 +1320,15 @@ if (document.getElementById("btn-skip-prep")) document.getElementById("btn-skip-
 
 function revealFoeAndBattle() {
   document.querySelectorAll("#prep-foe-slots .prep-slot").forEach((el, i) => { el.classList.remove("hidden"); el.querySelector(".nm").textContent = battle.foe[i].name; });
-  setTimeout(() => { show("screen-battle"); document.getElementById("battle-log").textContent = `Tier ${save.tierLevel} match against ${battle.opponentName} has begun!`; renderBattle(true); }, 500);
+  setTimeout(() => {
+    show("screen-battle");
+    const p = activePlayer(), f = activeFoe();
+    let log = `Tier ${save.tierLevel} match against ${battle.opponentName} has begun!`;
+    if (p.passive) log += `<br>Your ${p.name}'s ${p.passiveIcon} ${p.passive} is active.`;
+    if (f.passive) log += `<br>Foe ${f.name}'s ${f.passiveIcon} ${f.passive} is active.`;
+    document.getElementById("battle-log").innerHTML = log;
+    renderBattle(true);
+  }, 500);
 }
 
 function activePlayer() { return battle.player[battle.pIndex]; }
@@ -1356,66 +1413,108 @@ function aiPickAction() {
   const personality = AI_PERSONALITIES[battle.personality] || AI_PERSONALITIES.balanced;
   const aliveFoes = battle.foe.filter(m => !m.fainted);
 
+  /* --- THREAT ASSESSMENT --- */
   const bestPlyrMove = p.moves.reduce((best, mv) => {
     const s = mv.power * typeMultiplier(mv.type, f.type);
     return s > (best?.score || -1) ? { mv, score: s } : best;
   }, null);
   const aiAtDisadvantage = bestPlyrMove && bestPlyrMove.score > 80;
 
-  /* --- COMBO-AWARE AI --- */
-  let comboThreat = false;
-  let comboResistType = null;
-  if (battle.pCombo && battle.pCombo.length >= 2) {
-    const seq = battle.pCombo.slice(-2);
-    for (let len = 2; len <= 3; len++) {
-      for (const key in ELEMENTAL_COMBOS) {
-        const parts = key.split("_");
-        if (parts.length === len && parts.slice(0, seq.length).every((t, i) => t === seq[i])) {
+  /* --- COMBO PREDICTION SYSTEM --- */
+  let comboThreat = false, comboResistType = null, comboScore = 0;
+  if (battle.pCombo && battle.pCombo.length >= 1) {
+    const seq = battle.pCombo;
+    for (const key in ELEMENTAL_COMBOS) {
+      const parts = key.split("_");
+      if (parts.length < seq.length) continue;
+      if (parts.every((t, i) => t === seq[i])) {
+        if (parts.length > seq.length) {
           const nextType = parts[seq.length];
-          if (nextType && typeMultiplier(nextType, f.type) > 1) {
+          const currentMult = typeMultiplier(nextType, f.type);
+          const worstMult = aliveFoes.reduce((min, m) => Math.min(min, typeMultiplier(nextType, m.type)), 2);
+          if (currentMult > 1 || worstMult < 1) {
             comboThreat = true;
             comboResistType = nextType;
+            comboScore = Math.max(comboScore, ELEMENTAL_COMBOS[key].mult || 1);
           }
+        } else {
+          const combo = ELEMENTAL_COMBOS[key];
+          if (combo) comboScore = Math.max(comboScore, combo.mult || 1);
         }
       }
     }
   }
 
+  /* --- STATUS-AWARE SWITCH CHECK --- */
+  const hasHarmfulStatus = f.statusEffects && f.statusEffects.length > 0 &&
+    (f.statusEffects.includes("burn") || f.statusEffects.includes("poison")) &&
+    (f.hp / f.baseHp) <= 0.5;
+
+  /* --- SWITCH DECISION --- */
   if (aliveFoes.length > 1) {
     let shouldSwitch = false;
-    let switchReason = 0;
+    let switchPriority = 0;
 
-    // Combo threat evasion
-    if (comboThreat && (f.hp / f.baseHp) <= 0.5) {
+    // Combo threat evasion — more aggressive if combo is powerful
+    const comboThreatThreshold = comboScore > 1.8 ? 0.65 : 0.5;
+    if (comboThreat && (f.hp / f.baseHp) <= comboThreatThreshold && personality.dmgWeight >= 1.0) {
       shouldSwitch = true;
-      switchReason = 1.5;
+      switchPriority = 2;
+    }
+
+    // Harmful status — defensive/tactician personalities more likely to switch
+    if (hasHarmfulStatus && personality.switchChance > 0.2 && Math.random() < personality.switchChance) {
+      shouldSwitch = true;
+      switchPriority = Math.max(switchPriority, 1.5);
     }
 
     // Standard disadvantage check
     if (aiAtDisadvantage && (f.hp / f.baseHp) <= personality.switchBelowHpPct && Math.random() < personality.switchChance) {
       shouldSwitch = true;
-      switchReason = Math.max(switchReason, 1);
+      switchPriority = Math.max(switchPriority, 1);
+    }
+
+    // Reckless personality ignores combo threats
+    if (personality.dmgWeight >= 1.5 && switchPriority < 2) {
+      shouldSwitch = false;
     }
 
     if (shouldSwitch) {
-      let bestSwitch = null, bestResist = -1;
+      let bestSwitch = null, bestScore = -1;
       aliveFoes.forEach(candidate => {
-        if (candidate.uid === f.uid) return;
+        if (candidate === f) return;
         let totalDmg = 0;
         p.moves.forEach(mv => { totalDmg += mv.power * typeMultiplier(mv.type, candidate.type); });
         const avgMult = totalDmg / (p.moves.length * 100);
         let resistScore = 1 - avgMult;
+
         // Bonus for combo-resistant switch
         if (comboResistType && typeMultiplier(comboResistType, candidate.type) < 1) {
           resistScore += 0.3;
         }
-        if (resistScore > bestResist) { bestResist = resistScore; bestSwitch = candidate; }
+
+        // Passive synergy bonus — switch to a mon whose passive counters player
+        const candPassive = getPassive(candidate.type);
+        if (candPassive) {
+          if (candPassive.name === "Evasion" && p.atk > p.def) resistScore += 0.1;
+          if (candPassive.name === "Thorns" && p.atk > p.spd) resistScore += 0.1;
+          if (candPassive.name === "Fortify") resistScore += 0.05;
+        }
+
+        // HP bonus — prefer healthier mons
+        const hpRatio = candidate.hp / candidate.baseHp;
+        resistScore += hpRatio * 0.1;
+
+        if (resistScore > bestScore) { bestScore = resistScore; bestSwitch = candidate; }
       });
       if (bestSwitch) return { kind: "switch", index: battle.foe.indexOf(bestSwitch) };
     }
   }
 
+  /* --- MOVE SELECTION WITH COMBO-BUILDING & FINISHING PRIORITY --- */
   let best = null, bScore = -1;
+  const playerLowHp = (p.hp / p.baseHp) <= 0.3;
+
   f.moves.forEach(mv => {
     const mult = typeMultiplier(mv.type, p.type);
     const weatherMult = getWeatherMult(mv.type, p.type);
@@ -1423,11 +1522,34 @@ function aiPickAction() {
     const stabBonus = mv.type === f.type ? personality.stabBonus : 1;
     const effPower = mv.power * stabBonus;
     const typeWeight = mult > 1 ? 1.3 : mult < 1 ? 0.7 : 1;
-    // Combo-building bonus: AI prefers same-type moves to build its own combos
-    const comboBuildBonus = battle.fCombo && battle.fCombo.length >= 1 && mv.type === battle.fCombo[battle.fCombo.length - 1] ? 1.15 : 1;
-    const s = effPower * mult * weatherMult * typeWeight * accFactor * personality.dmgWeight * comboBuildBonus;
+
+    // Combo-building: AI actively tries to build its own combos
+    let comboBuildBonus = 1;
+    if (battle.fCombo && battle.fCombo.length >= 1) {
+      const seq = battle.fCombo;
+      for (const key in ELEMENTAL_COMBOS) {
+        const parts = key.split("_");
+        if (parts.length > seq.length + 1) continue;
+        if (parts.slice(0, seq.length).every((t, i) => t === seq[i]) && parts[seq.length] === mv.type) {
+          comboBuildBonus = 1.25;
+          break;
+        }
+      }
+      // Continue existing chain bonus
+      if (mv.type === seq[seq.length - 1]) comboBuildBonus = Math.max(comboBuildBonus, 1.15);
+    }
+
+    // Finishing move bonus
+    const finishBonus = playerLowHp && mult > 0 ? 1.2 : 1;
+
+    // Status application bonus — prefer moves that can apply status
+    const statusBonus = (!p.statusEffects || p.statusEffects.length === 0) &&
+      { ember: "burn", aqua: "freeze", volt: "burn", gale: "freeze" }[mv.type] ? 1.1 : 1;
+
+    const s = effPower * mult * weatherMult * typeWeight * accFactor * personality.dmgWeight * comboBuildBonus * finishBonus * statusBonus;
     if (s > bScore) { bScore = s; best = mv; }
   });
+
   return { kind: "move", move: best || f.moves[0] };
 }
 
@@ -1483,14 +1605,7 @@ async function resolveTurn(pAct, aiAct) {
 
     if (atk.fainted || def.fainted) continue;
 
-    const turnPassive = getPassive(atk.type);
-    if (turnPassive && turnPassive.onTurnStart && !atk.fainted) {
-      const healed = turnPassive.onTurnStart(atk);
-      if (healed > 0) {
-        logLines.push(`${atk.name}'s ${turnPassive.icon} ${turnPassive.name} restored ${healed} HP.`);
-        renderBattle(false);
-      }
-    }
+    if (triggerPassiveOnTurnStart(atk, logLines)) renderBattle(false);
 
     if (atk.statusSkipTurns > 0) {
       logLines.push(`${atk.name} is frozen solid and can't move!`);
@@ -1531,9 +1646,9 @@ async function resolveTurn(pAct, aiAct) {
 
     const mv = side === "p" ? pAct.move : aiAct.move;
 
-    const dodgePassive = getPassive(def.type);
-    if (dodgePassive && dodgePassive.onDefend && !def.fainted && dodgePassive.onDefend(def)) {
-      logLines.push(`${def.name} evaded the attack with ${dodgePassive.icon} ${dodgePassive.name}!`);
+    if (triggerPassiveOnDefend(def)) {
+      const dp = getPassive(def.type);
+      logLines.push(`${def.name} evaded the attack with ${dp.icon} ${dp.name}!`);
       updateLog();
       if (i < order.length - 1) await delay(1800);
       continue;
@@ -1627,18 +1742,9 @@ async function resolveTurn(pAct, aiAct) {
       setTimeout(() => dmgFloat.remove(), 1000);
     }
 
-    const defPassive = getPassive(def.type);
-    if (defPassive && defPassive.onHit && !def.fainted) {
-      const pResult = defPassive.onHit(def, atk);
-      if (typeof pResult === "number" && pResult > 0) {
-        logLines.push(`<b>${def.name}'s ${defPassive.icon} ${defPassive.name}</b> reflected <b>${pResult}</b> damage back!`);
-        if (atk.hp <= 0) { atk.fainted = true; logLines.push(`<b>${atk.name} was knocked out by reflected damage!</b>`); }
-        renderBattle(false);
-        if (atk.fainted) break;
-      } else if (pResult === true) {
-        logLines.push(`<b>${atk.name} was burned by ${def.name}'s ${defPassive.icon} ${defPassive.name}!</b>`);
-        renderBattle(false);
-      }
+    if (triggerPassiveOnHit(def, atk, logLines)) {
+      renderBattle(false);
+      if (atk.fainted) break;
     }
 
     if (!def.fainted && def.hp > 0 && def.hp / def.baseHp <= 0.25 && def.item === "vitalberry" && !def.itemUsed) {
@@ -1782,9 +1888,13 @@ function startPrepWithData(playerUids, oppIds, aiLvl, trainer, oppRank) {
 
   document.getElementById("prep-player-slots").innerHTML = "";
   document.getElementById("prep-foe-slots").innerHTML = "";
-  battle.player.forEach((m, i) => document.getElementById("prep-player-slots").insertAdjacentHTML("beforeend", `<div class="prep-slot ${i === 0 ? 'lead' : ''}"><div class="n">${i + 1}</div><div class="nm">${m.name} ${m.passiveIcon || ''}</div></div>`));
+  battle.player.forEach((m, i) => {
+    const passiveHtml = m.passive ? `<span class="passive-prep" title="${m.passive}: ${m.passiveDesc || ''}">${m.passiveIcon}</span>` : '';
+    document.getElementById("prep-player-slots").insertAdjacentHTML("beforeend",
+      `<div class="prep-slot ${i === 0 ? 'lead' : ''}"><div class="n">${i + 1}</div><div class="nm">${m.name} ${passiveHtml}</div></div>`);
+  });
   battle.foe.forEach((m, i) => document.getElementById("prep-foe-slots").insertAdjacentHTML("beforeend", `<div class="prep-slot ${i === 0 ? 'lead' : ''} hidden"><div class="n">${i + 1}</div><div class="nm">???</div></div>`));
-  document.getElementById("prep-foe-name").textContent = battle.opponentName + (oppRank ? ` (${oppRank})` : "");
+  document.getElementById("prep-foe-name").textContent = trainer.name + (oppRank ? ` (${oppRank})` : "");
   show("screen-prep");
   runPrepTimer();
 }
