@@ -66,6 +66,135 @@ const TYPE_CHART = {
 };
 function typeMultiplier(atkType, defType) { return (atkType === "neutral") ? 1 : ((TYPE_CHART[atkType] && TYPE_CHART[atkType][defType]) || 1); }
 
+const ELEMENTAL_COMBOS = {
+  "gale_ember": { name:"Firestorm", icon:"🌪️🔥", desc:"Bonus fire damage from wind-fanning", mult:1.5, effect:"dmgBoost", dur:"once" },
+  "volt_aqua": { name:"Thunderstorm", icon:"⚡🌊", desc:"Stunning bolt through water", mult:1.4, effect:"stun", dur:"once" },
+  "ember_stone": { name:"Magma Eruption", icon:"🔥🪨", desc:"Molten rock smash", mult:1.5, effect:"dmgBoost", dur:"once" },
+  "stone_verdant": { name:"Overgrowth", icon:"🪨🌿", desc:"Life springs from stone", mult:0.15, effect:"heal", dur:"once" },
+  "volt_gale": { name:"Tempest", icon:"⚡💨", desc:"Electrified winds batter the foe", mult:0.5, effect:"spdDmg", dur:"once" },
+  "verdant_aqua": { name:"Bloom", icon:"🌿🌊", desc:"Nourishing waters heal the team", mult:0.1, effect:"teamHeal", dur:"once" },
+  "ember_aqua_verdant": { name:"Seasonal Cycle", icon:"🔥🌊🌿", desc:"Nature's wrath reduces ATK", mult:2.0, effect:"atkDebuff", dur:"once" },
+  "stone_gale_volt": { name:"Cataclysm", icon:"🪨💨⚡", desc:"Tectonic fury reduces DEF", mult:2.0, effect:"defDebuff", dur:"once" }
+};
+
+function checkAndApplyCombo(side, attacker, defender, mv, dmg, logLines, arena) {
+  const tracker = side === "p" ? battle.pCombo : battle.fCombo;
+  tracker.push(mv.type);
+  if (tracker.length > 3) tracker.shift();
+  const comboApplied = { active: false, name: "", icon: "", desc: "", bonusDmg: 0 };
+
+  for (let len = 3; len >= 2; len--) {
+    if (tracker.length < len) continue;
+    const seq = tracker.slice(tracker.length - len);
+    const key = seq.join("_");
+    const combo = ELEMENTAL_COMBOS[key];
+    if (!combo) continue;
+
+    comboApplied.active = true;
+    comboApplied.name = combo.name;
+    comboApplied.icon = combo.icon;
+    comboApplied.desc = combo.desc;
+
+    if (combo.effect === "dmgBoost") {
+      const bonus = Math.round(dmg * (combo.mult - 1));
+      defender.hp = Math.max(0, defender.hp - bonus);
+      if (arena) {
+        const defEl = document.getElementById(side === "p" ? "foe-mon" : "player-mon");
+        if (defEl) {
+          const hf = document.createElement("div");
+          hf.className = "dmg-float combo"; hf.textContent = `${combo.icon} ${bonus}`;
+          const dRect = defEl.getBoundingClientRect(), aRect = arena.getBoundingClientRect();
+          hf.style.left = (dRect.left - aRect.left + dRect.width / 2 - 25) + "px";
+          hf.style.top = (dRect.top - aRect.top - 25) + "px";
+          arena.appendChild(hf);
+          setTimeout(() => hf.remove(), 1200);
+        }
+      }
+      comboApplied.bonusDmg = bonus;
+    } else if (combo.effect === "stun") {
+      if (!defender.statusEffects || defender.statusEffects.length === 0) {
+        applyStatus(defender, "freeze");
+        const defEl2 = document.getElementById(side === "p" ? "foe-mon" : "player-mon");
+        if (defEl2) { defEl2.classList.remove("status-applied"); void defEl2.offsetWidth; defEl2.classList.add("status-applied"); }
+      }
+    } else if (combo.effect === "heal") {
+      const healAmt = Math.round(attacker.baseHp * combo.mult);
+      attacker.hp = Math.min(attacker.baseHp, attacker.hp + healAmt);
+      if (arena) {
+        const atkEl = document.getElementById(side === "p" ? "player-mon" : "foe-mon");
+        if (atkEl) {
+          const hf = document.createElement("div");
+          hf.className = "dmg-float heal"; hf.textContent = `+${healAmt}`;
+          const tRect = atkEl.getBoundingClientRect(), aRect = arena.getBoundingClientRect();
+          hf.style.left = (tRect.left - aRect.left + tRect.width / 2 - 15) + "px";
+          hf.style.top = (tRect.top - aRect.top - 5) + "px";
+          arena.appendChild(hf);
+          setTimeout(() => hf.remove(), 1000);
+        }
+      }
+    } else if (combo.effect === "teamHeal") {
+      const team = side === "p" ? battle.player : battle.foe;
+      team.forEach(m => {
+        if (!m.fainted) {
+          m.hp = Math.min(m.baseHp, m.hp + Math.round(m.baseHp * combo.mult));
+        }
+      });
+    } else if (combo.effect === "spdDmg") {
+      const spdBonus = Math.round(attacker.spd * combo.mult);
+      defender.hp = Math.max(0, defender.hp - spdBonus);
+      comboApplied.bonusDmg = spdBonus;
+      if (arena) {
+        const defEl3 = document.getElementById(side === "p" ? "foe-mon" : "player-mon");
+        if (defEl3) {
+          const hf = document.createElement("div");
+          hf.className = "dmg-float combo"; hf.textContent = `${combo.icon} ${spdBonus}`;
+          const dRect = defEl3.getBoundingClientRect(), aRect = arena.getBoundingClientRect();
+          hf.style.left = (dRect.left - aRect.left + dRect.width / 2 - 25) + "px";
+          hf.style.top = (dRect.top - aRect.top - 25) + "px";
+          arena.appendChild(hf);
+          setTimeout(() => hf.remove(), 1200);
+        }
+      }
+    } else if (combo.effect === "atkDebuff") {
+      defender.statusAtkMult = (defender.statusAtkMult || 1) * 0.75;
+    } else if (combo.effect === "defDebuff") {
+      const defDmg = Math.round(dmg * (combo.mult - 1));
+      defender.hp = Math.max(0, defender.hp - defDmg);
+      comboApplied.bonusDmg = defDmg;
+      if (arena) {
+        const defEl4 = document.getElementById(side === "p" ? "foe-mon" : "player-mon");
+        if (defEl4) {
+          const hf = document.createElement("div");
+          hf.className = "dmg-float combo"; hf.textContent = `${combo.icon} ${defDmg}`;
+          const dRect = defEl4.getBoundingClientRect(), aRect = arena.getBoundingClientRect();
+          hf.style.left = (dRect.left - aRect.left + dRect.width / 2 - 25) + "px";
+          hf.style.top = (dRect.top - aRect.top - 25) + "px";
+          arena.appendChild(hf);
+          setTimeout(() => hf.remove(), 1200);
+        }
+      }
+    }
+
+    tracker._lastCombo = combo.name;
+    break;
+  }
+
+  return comboApplied;
+}
+
+function updateComboUI() {
+  const el = document.getElementById("combo-tracker");
+  if (!el) return;
+  const pCombo = battle.pCombo || [];
+  const fCombo = battle.fCombo || [];
+  let html = "";
+  const seqP = pCombo.slice(-3).join(" → ").toUpperCase();
+  const seqF = fCombo.slice(-3).join(" → ").toUpperCase();
+  if (seqP) html += `<div class="combo-side"><span class="combo-label">YOUR CHAIN:</span> <span class="combo-seq">${seqP}</span></div>`;
+  if (seqF) html += `<div class="combo-side"><span class="combo-label">FOE CHAIN:</span> <span class="combo-seq">${seqF}</span></div>`;
+  el.innerHTML = html;
+}
+
 /* ============================= STATUS EFFECTS & WEATHER ============================= */
 const STATUS_EFFECTS = {
   burn: {
@@ -1057,7 +1186,8 @@ function startTourneyMatch(matchIdx) {
     opponentName: aiOpp.trainer.name,
     personality: aiOpp.trainer.personality,
     over: false,
-    tournament: { matchIdx: matchIdx }
+    tournament: { matchIdx: matchIdx },
+    pCombo: [], fCombo: []
   };
 
   const weatherKeys = Object.keys(WEATHER_CONDITIONS).filter(k => k !== "none");
@@ -1372,6 +1502,15 @@ async function resolveTurn(pAct, aiAct) {
     if (weatherMult !== 1) dmgLog += weatherMult > 1 ? " <span style='color:var(--warn)'>Weather boosted!</span>" : " <span style='color:var(--text-dim)'>Weather dampened...</span>";
     logLines.push(dmgLog);
 
+    const comboResult = checkAndApplyCombo(side, atk, def, mv, dmg, logLines, document.getElementById("arena"));
+    if (comboResult.active) {
+      logLines.push(`<b style="color:var(--gold)">✦ ${comboResult.icon} ${comboResult.name}!</b> <span style="color:var(--text-dim)">${comboResult.desc}</span>`);
+      if (comboResult.bonusDmg > 0) {
+        logLines.push(`<span style="color:var(--warn)">Combo bonus: +${comboResult.bonusDmg} extra damage!</span>`);
+      }
+    }
+    updateComboUI();
+
     if (!def.statusEffects || def.statusEffects.length === 0) {
       const statusChance = { ember: 0.2, aqua: 0.2, verdant: 0, volt: 0.2, stone: 0, gale: 0 };
       const statusMap = { ember: "burn", aqua: "freeze", volt: "burn", gale: "freeze" };
@@ -1530,7 +1669,8 @@ function startPrepWithData(playerUids, oppIds, aiLvl, trainer, oppRank) {
     pIndex: 0, fIndex: 0,
     opponentName: trainer.name,
     personality: trainer.personality,
-    over: false
+    over: false,
+    pCombo: [], fCombo: []
   };
 
   const weatherKeys = Object.keys(WEATHER_CONDITIONS).filter(k => k !== "none");
