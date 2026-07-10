@@ -1423,11 +1423,11 @@ function aiPickAction() {
   /* --- COMBO PREDICTION SYSTEM --- */
   let comboThreat = false, comboResistType = null, comboScore = 0;
   if (battle.pCombo && battle.pCombo.length >= 1) {
-    const seq = battle.pCombo; // full sequence
+    const seq = battle.pCombo;
     for (const key in ELEMENTAL_COMBOS) {
       const parts = key.split("_");
-      if (parts.length > seq.length) continue;
-      if (parts.every((t, i) => i >= seq.length || t === seq[i])) {
+      if (parts.length < seq.length) continue;
+      if (parts.every((t, i) => t === seq[i])) {
         if (parts.length > seq.length) {
           const nextType = parts[seq.length];
           const currentMult = typeMultiplier(nextType, f.type);
@@ -1437,7 +1437,7 @@ function aiPickAction() {
             comboResistType = nextType;
             comboScore = Math.max(comboScore, ELEMENTAL_COMBOS[key].mult || 1);
           }
-        } else if (parts.length <= seq.length) {
+        } else {
           const combo = ELEMENTAL_COMBOS[key];
           if (combo) comboScore = Math.max(comboScore, combo.mult || 1);
         }
