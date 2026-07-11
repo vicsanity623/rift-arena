@@ -2041,10 +2041,15 @@ function endBattle(won) {
   document.getElementById("end-banner").textContent = won ? "VICTORY" : "DEFEAT";
   document.getElementById("end-banner").className = "end-banner " + (won ? "win" : "lose");
 
+  const guildMults = typeof getGuildRewardMultipliers === "function" ? getGuildRewardMultipliers() : { gold: 1, xp: 1 };
+
   const vpChange = won ? 30 : -15;
-  const xpReward = won ? 200 : 50;
-  const goldReward = won ? 85 : 20;
+  let xpReward = won ? 200 : 50;
+  let goldReward = won ? 85 : 20;
   const tierXpReward = won ? 60 : 10;
+
+  if (guildMults.gold > 1) goldReward = Math.round(goldReward * guildMults.gold);
+  if (guildMults.xp > 1) xpReward = Math.round(xpReward * guildMults.xp);
 
   const format = typeof window.formatNum === "function" ? window.formatNum : (n => n);
   const trackQuest = typeof window.trackQuestProgress === "function" ? window.trackQuestProgress : (() => { });
@@ -2109,8 +2114,9 @@ function handleTourneyMatchEnd(won) {
   }
   match.done = true;
 
-  const xpReward = won ? 100 : 30;
-  const goldReward = won ? 40 : 10;
+  const guildMults = typeof getGuildRewardMultipliers === "function" ? getGuildRewardMultipliers() : { gold: 1, xp: 1 };
+  const xpReward = Math.round((won ? 100 : 30) * guildMults.xp);
+  const goldReward = Math.round((won ? 40 : 10) * guildMults.gold);
   save.gold += goldReward;
   save.playerXp += xpReward;
 

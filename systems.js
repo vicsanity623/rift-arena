@@ -464,10 +464,11 @@ function generateSurvivalWave() {
 function handleSurvivalWaveEnd(won) {
   if (won) {
     survivalState.wave++;
+    const guildMults = typeof getGuildRewardMultipliers === "function" ? getGuildRewardMultipliers() : { gold: 1, xp: 1 };
     const waveRewards = {
-      gold: 50 + survivalState.wave * 25,
+      gold: Math.round((50 + survivalState.wave * 25) * guildMults.gold),
       gems: 5 + survivalState.wave * 2,
-      xp: 100 + survivalState.wave * 50,
+      xp: Math.round((100 + survivalState.wave * 50) * guildMults.xp),
       vp: 10 + survivalState.wave * 5
     };
     survivalState.rewards.gold += waveRewards.gold;
@@ -673,10 +674,11 @@ function initExploreUI() {
 function claimExplore() {
   const mSave = save.mons.find(m => m.uid === save.explore.uid);
   const dur = save.explore.durationMins;
+  const guildMults = typeof getGuildRewardMultipliers === "function" ? getGuildRewardMultipliers() : { gold: 1, xp: 1, explore: 1 };
   
   // Calculate Rewards
-  const xpGained = dur * 25;
-  const goldGained = dur * 10;
+  const xpGained = Math.round(dur * 25 * guildMults.xp * guildMults.explore);
+  const goldGained = Math.round(dur * 10 * guildMults.gold * guildMults.explore);
   const gemsGained = Math.floor(dur / 5);
   const vpGained = dur * 2;
   
@@ -1116,12 +1118,39 @@ const GUILD_NAMES = [
   "Verdant Circle", "Crystal Sentinels", "Shadow Pact", "Thunder Cohort"
 ];
 
-const GUILD_PERKS = {
-  battle: { name: "Battle Boon", desc: "+5% Gold from battles", effect: () => save.gold + Math.floor(save.gold * 0.05) },
-  explore: { name: "Explorer's Grant", desc: "+10% Explore rewards", effect: null },
-  training: { name: "Training Accel", desc: "-20% Dojo training time", effect: null },
-  shop: { name: "Merchant's Discount", desc: "-10% Shop prices", effect: null }
+const GUILD_PERK_DEFS = {
+  battle: { name: "Battle Boon", icon: "⚔️", desc: "Bonus gold from battles", basePct: 5, scalePerLvl: 2.5, unlockLvl: 1, maxPct: 30 },
+  battleXp: { name: "Battle XP Boost", icon: "✨", desc: "Bonus XP from battles", basePct: 10, scalePerLvl: 3, unlockLvl: 2, maxPct: 40 },
+  explore: { name: "Explorer's Grant", icon: "🗺️", desc: "Bonus explore rewards", basePct: 10, scalePerLvl: 5, unlockLvl: 1, maxPct: 50 },
+  training: { name: "Training Accel", icon: "🥋", desc: "Reduced dojo training time", basePct: 20, scalePerLvl: 5, unlockLvl: 3, maxPct: 60 },
+  shop: { name: "Merchant's Discount", icon: "🏪", desc: "Reduced shop prices", basePct: 10, scalePerLvl: 3, unlockLvl: 4, maxPct: 35 },
+  goldFind: { name: "Gold Rush", icon: "🪙", desc: "Bonus gold from all sources", basePct: 8, scalePerLvl: 2, unlockLvl: 5, maxPct: 25 }
 };
+
+function getGuildPerkValue(perkKey, guildLevel) {
+  const def = GUILD_PERK_DEFS[perkKey];
+  if (!def) return 0;
+  const raw = def.basePct + (guildLevel - def.unlockLvl) * def.scalePerLvl;
+  return Math.min(def.maxPct, Math.max(0, raw));
+}
+
+function getGuildPerkDesc(perkKey, guildLevel) {
+  const def = GUILD_PERK_DEFS[perkKey];
+  if (!def) return "";
+  const val = getGuildPerkValue(perkKey, guildLevel);
+  if (perkKey === "training" || perkKey === "shop") {
+    return `-${Math.round(val)}% ${def.desc.replace(/^Reduced |Reduced /, "").toLowerCase()}`;
+  }
+  return `+${Math.round(val)}% ${def.desc.replace(/^Bonus /, "").toLowerCase()}`;
+}
+
+function getUnlockedPerks(guildLevel) {
+  return Object.keys(GUILD_PERK_DEFS).filter(k => GUILD_PERK_DEFS[k].unlockLvl <= guildLevel);
+}
+
+function getAllPerkKeys() {
+  return Object.keys(GUILD_PERK_DEFS);
+}
 
 function initGuildUI() {
   const container = document.getElementById("guild-content");
@@ -1138,21 +1167,23 @@ function initGuildUI() {
 
 function showGuildCreate(container) {
   const createCost = 500;
+  const startPerks = getUnlockedPerks(1);
   container.innerHTML = `
     <div class="details-card" style="text-align:center;">
       <h3>🏰 Guild Hall</h3>
       <p class="subtitle">Join or create a guild to unlock clan perks and compete together!</p>
       <div style="margin:16px 0;">
         <div style="font-size:48px;">🏴</div>
-        <p style="color:var(--text-dim); font-size:13px;">Create a guild for ${formatNum(createCost)} 🪙 and choose your name and perk.</p>
+        <p style="color:var(--text-dim); font-size:13px;">Create a guild for ${formatNum(createCost)} 🪙 and choose your name and starting perk.</p>
+        <p style="color:var(--gold-dim); font-size:11px;">✦ More perks unlock as your guild grows (Lv.2, 3, 4, 5)!</p>
       </div>
       <label style="font-size:12px; color:var(--text-dim); display:block; text-align:left;">Guild Name:</label>
       <select id="guild-name-select" class="btn ghost" style="border:1px solid var(--line); color:white; padding:10px;">
         ${GUILD_NAMES.map(n => `<option value="${n}">${n}</option>`).join("")}
       </select>
-      <label style="font-size:12px; color:var(--text-dim); display:block; text-align:left; margin-top:10px;">Guild Perk:</label>
+      <label style="font-size:12px; color:var(--text-dim); display:block; text-align:left; margin-top:10px;">Starting Guild Perk:</label>
       <select id="guild-perk-select" class="btn ghost" style="border:1px solid var(--line); color:white; padding:10px;">
-        ${Object.entries(GUILD_PERKS).map(([k, v]) => `<option value="${k}">${v.name} — ${v.desc}</option>`).join("")}
+        ${startPerks.map(k => `<option value="${k}">${GUILD_PERK_DEFS[k].icon} ${GUILD_PERK_DEFS[k].name} — ${getGuildPerkDesc(k, 1)}</option>`).join("")}
       </select>
       <button class="btn gold" id="btn-create-guild" style="margin-top:16px;" ${save.gold < createCost ? 'disabled' : ''}>
         ${save.gold < createCost ? `Need ${formatNum(createCost)} 🪙` : `Create Guild (${formatNum(createCost)} 🪙)`}
@@ -1173,53 +1204,108 @@ function showGuildCreate(container) {
       xp: 0,
       members: 1,
       founded: Date.now(),
-      donated: 0
+      donated: 0,
+      perks: [perk]
     };
     saveGame();
     refreshHome();
     initGuildUI();
-    alert(`🏴 Guild "${name}" created!\n\nPerk: ${GUILD_PERKS[perk].name}\n${GUILD_PERKS[perk].desc}`);
+    const val = getGuildPerkValue(perk, 1);
+    alert(`🏴 Guild "${name}" created!\n\nPerk: ${GUILD_PERK_DEFS[perk].name}\n${getGuildPerkDesc(perk, 1)}`);
   };
 }
 
 function showGuildDashboard(container) {
   const g = save.guild;
+  if (!g.perks) g.perks = [g.perk];
   const guildXpNeeded = g.level * 300;
+  const unlocked = getUnlockedPerks(g.level);
+  const allKeys = getAllPerkKeys();
+
+  let perksHtml = "";
+  allKeys.forEach(k => {
+    const def = GUILD_PERK_DEFS[k];
+    const isUnlocked = unlocked.includes(k);
+    const isOwned = g.perks.includes(k);
+    const val = getGuildPerkValue(k, g.level);
+    const cls = isOwned ? "guild-perk owned" : isUnlocked && !isOwned ? "guild-perk available" : "guild-perk locked";
+
+    perksHtml += `<div class="${cls}">
+      <div class="guild-perk-icon">${def.icon}</div>
+      <div class="guild-perk-info">
+        <div class="guild-perk-name">${def.name}</div>
+        <div class="guild-perk-desc">${getGuildPerkDesc(k, g.level)}</div>
+      </div>
+      <div class="guild-perk-status">${isOwned ? '✓ Active' : isUnlocked ? '⚠️ Unlocked' : `🔒 Lv.${def.unlockLvl}`}</div>
+    </div>`;
+  });
 
   container.innerHTML = `
     <div class="details-card" style="text-align:center;">
       <div style="font-size:40px; margin-bottom:8px;">🏰</div>
       <h3>${g.name}</h3>
-      <div style="display:flex; justify-content:center; gap:16px; margin:12px 0;">
-        <div style="font-family:var(--mono); font-size:13px; color:var(--text-dim);">Level ${g.level}</div>
-        <div style="font-family:var(--mono); font-size:13px; color:var(--gold);">${GUILD_PERKS[g.perk].name}</div>
+      <div style="display:flex; justify-content:center; gap:12px; margin:8px 0; flex-wrap:wrap;">
+        <span style="font-family:var(--mono); font-size:13px; color:var(--text-dim);">Level ${g.level}</span>
+        <span style="font-family:var(--mono); font-size:13px; color:var(--gold);">${g.perks.length} / ${allKeys.length} Perks</span>
+        <span style="font-family:var(--mono); font-size:13px; color:var(--text-dim);">Members: ${g.members}</span>
       </div>
       <div class="xp-bar" style="width:100%; margin:8px 0;"><div class="xp-fill" style="width:${Math.min(100, (g.xp / guildXpNeeded) * 100)}%"></div></div>
-      <div style="font-size:11px; color:var(--text-dim); font-family:var(--mono); margin-bottom:12px;">Guild XP: ${formatNum(g.xp)} / ${formatNum(guildXpNeeded)}</div>
-      <div style="background:var(--card-hi); border-radius:12px; padding:12px; margin:8px 0;">
-        <div style="font-size:12px; color:var(--text-dim);">Guild Perk</div>
-        <div style="font-weight:bold; font-size:14px;">${GUILD_PERKS[g.perk].name}</div>
-        <div style="font-size:11px; color:var(--text-dim);">${GUILD_PERKS[g.perk].desc}</div>
+      <div style="font-size:11px; color:var(--text-dim); font-family:var(--mono); margin-bottom:8px;">Guild XP: ${formatNum(g.xp)} / ${formatNum(guildXpNeeded)}</div>
+    </div>
+    <div class="details-card">
+      <div style="font-weight:bold; font-size:14px; text-align:center; margin-bottom:8px;">🏅 Guild Perks</div>
+      <div class="guild-perks-list">${perksHtml}</div>
+      ${unlocked.filter(k => !g.perks.includes(k)).length > 0 ? `<button class="btn gold" id="btn-claim-perks" style="margin-top:8px;">Claim New Perks</button>` : ''}
+    </div>
+    <div class="details-card" style="flex-direction:row; justify-content:space-between; align-items:center;">
+      <div>
+        <div style="font-size:12px; color:var(--text-dim);">Contribute to the guild</div>
+        <div style="font-size:11px; color:var(--gold-dim);">100 🪙 → 50 Guild XP</div>
       </div>
-      <div style="display:flex; gap:8px; margin-top:12px;">
-        <button class="btn ghost" id="btn-guild-donate" style="flex:1;">Donate 100 🪙</button>
-      </div>
+      <button class="btn gold" id="btn-guild-donate" style="width:auto; padding:10px 20px;">Donate</button>
     </div>
   `;
+
+  const claimBtn = document.getElementById("btn-claim-perks");
+  if (claimBtn) {
+    claimBtn.onclick = () => {
+      const newlyUnlocked = unlocked.filter(k => !g.perks.includes(k));
+      if (newlyUnlocked.length > 0) {
+        newlyUnlocked.forEach(k => { if (!g.perks.includes(k)) g.perks.push(k); });
+        saveGame();
+        alert(`✨ New guild perks activated!\n\n${newlyUnlocked.map(k => `${GUILD_PERK_DEFS[k].icon} ${GUILD_PERK_DEFS[k].name}: ${getGuildPerkDesc(k, g.level)}`).join("\n")}`);
+        refreshHome();
+        initGuildUI();
+      }
+    };
+  }
 
   document.getElementById("btn-guild-donate").onclick = () => {
     if (save.gold < 100) return alert("Need 100 gold to donate.");
     save.gold -= 100;
     save.guild.donated += 100;
     save.guild.xp += 50;
-    while (save.guild.xp >= guildXpNeeded) {
-      save.guild.xp -= guildXpNeeded;
+    const prevLevel = save.guild.level;
+    while (save.guild.xp >= save.guild.level * 300) {
+      save.guild.xp -= save.guild.level * 300;
       save.guild.level++;
     }
-    saveGame();
-    refreshHome();
-    initGuildUI();
-    alert(`Donated 100 🪙 to the guild! Guild gained 50 XP.`);
+    if (save.guild.level > prevLevel) {
+      const newUnlocked = getUnlockedPerks(save.guild.level).filter(k => !save.guild.perks.includes(k));
+      let msg = `🏴 Guild leveled up to Lv.${save.guild.level}!`;
+      if (newUnlocked.length > 0) {
+        msg += `\n\nNew perks available:\n${newUnlocked.map(k => `${GUILD_PERK_DEFS[k].icon} ${GUILD_PERK_DEFS[k].name}`).join("\n")}`;
+      }
+      saveGame();
+      refreshHome();
+      initGuildUI();
+      alert(msg);
+    } else {
+      saveGame();
+      refreshHome();
+      initGuildUI();
+      alert(`Donated 100 🪙 to the guild! Guild gained 50 XP.`);
+    }
   };
 }
 
@@ -1490,9 +1576,10 @@ function handleDungeonFloorEnd(won) {
     const currentFloor = dungeonState.currentFloor;
     const lootInfo = dd.loot.find(l => l.floor === currentFloor) || dd.loot[dd.loot.length - 1];
 
-    const goldReward = lootInfo.gold;
+    const guildMults = typeof getGuildRewardMultipliers === "function" ? getGuildRewardMultipliers() : { gold: 1, xp: 1 };
+    const goldReward = Math.round(lootInfo.gold * guildMults.gold);
     const gemsReward = lootInfo.gems;
-    const xpReward = lootInfo.xp;
+    const xpReward = Math.round(lootInfo.xp * guildMults.xp);
 
     dungeonState.totalRewards.gold += goldReward;
     dungeonState.totalRewards.gems += gemsReward;
@@ -1654,6 +1741,23 @@ function dungeonComplete() {
   alert(msg);
   document.getElementById("screen-dungeon-floor-end").classList.remove("active");
   show("screen-home");
+}
+
+function getGuildRewardMultipliers() {
+  const mults = { gold: 1, xp: 1, explore: 1, training: 1, shop: 1 };
+  if (!save.guild) return mults;
+  const g = save.guild;
+  if (!g.perks) g.perks = [g.perk];
+  g.perks.forEach(k => {
+    const val = getGuildPerkValue(k, g.level) / 100;
+    if (k === "battle") mults.gold = 1 + val;
+    if (k === "battleXp") mults.xp = 1 + val;
+    if (k === "explore") mults.explore = 1 + val;
+    if (k === "training") mults.training = 1 - val;
+    if (k === "shop") mults.shop = 1 - val;
+    if (k === "goldFind") { mults.gold = mults.gold * (1 + val); mults.explore = mults.explore * (1 + val); }
+  });
+  return mults;
 }
 
 function updateDungeonDash() {
