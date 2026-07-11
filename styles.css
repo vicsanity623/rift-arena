@@ -454,3 +454,23 @@ select.btn.ghost option { background: var(--bg); color: white; }
 .guild-perk-status{ font-size:10px; font-family:var(--mono); color:var(--text-dim); white-space:nowrap; }
 .guild-perk.owned .guild-perk-status{ color:var(--safe); }
 .guild-perk.available .guild-perk-status{ color:var(--gold); }
+
+/* Forge / Crafting System */
+.forge-recipe{ background:var(--card); border:1.5px solid var(--line); border-radius:14px; padding:14px; display:flex; flex-direction:column; gap:8px; }
+.forge-recipe.craftable{ border-color:var(--safe); }
+.forge-recipe-header{ display:flex; justify-content:space-between; align-items:center; }
+.forge-recipe-name{ font-family:var(--display); font-weight:700; font-size:15px; }
+.forge-recipe-tier{ font-size:10px; font-weight:700; padding:2px 8px; border-radius:4px; }
+.forge-recipe-desc{ font-size:11px; color:var(--text-dim); }
+.forge-recipe-mats{ display:flex; flex-wrap:wrap; gap:6px; margin:4px 0; }
+.forge-material-tag{ background:var(--card-hi); border:1px solid var(--line); border-radius:6px; padding:4px 8px; font-size:11px; font-family:var(--mono); }
+.forge-material-tag.have{ border-color:var(--safe); color:var(--safe); }
+.forge-material-tag.need{ border-color:var(--danger); color:var(--danger); }
+.forge-recipe-cost{ font-family:var(--mono); font-size:12px; color:var(--gold); }
+.forge-equip-slot{ background:var(--card); border:1.5px solid var(--line); border-radius:12px; padding:12px; display:flex; align-items:center; gap:10px; cursor:pointer; transition:border-color .15s ease; }
+.forge-equip-slot:hover{ border-color:var(--gold-dim); }
+.forge-equip-slot-icon{ font-size:20px; width:32px; text-align:center; }
+.forge-equip-slot-name{ font-weight:700; font-size:13px; }
+.forge-equip-item{ font-size:12px; color:var(--text-dim); }
+.forge-materials-header{ font-size:12px; color:var(--text-dim); margin:8px 0 4px; }
+.forge-no-mats{ font-size:12px; color:var(--text-dim); font-style:italic; }
