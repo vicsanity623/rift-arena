@@ -813,11 +813,13 @@ function initBagUI() {
     const amt = save.bag[itemKey];
     if (amt > 0) {
       const itm = ITEMS[itemKey];
+      if (itm && itm.slot === "material") return;
+      const tierColor = TIER_COLORS[itm.tier] || "#a8a2c4";
       const card = document.createElement("div");
       card.className = "switch-opt";
       card.innerHTML = `
         <div style="flex:1;">
-          <div style="font-weight:bold; font-size:14px;">${itm.name} (x${amt})</div>
+          <div style="font-weight:bold; font-size:14px;"><span style="color:${tierColor};">●</span> ${itm.name} <span style="font-size:10px;color:${tierColor};">[${TIER_NAMES[itm.tier]||itm.tier}]</span> <span style="font-size:10px;color:var(--text-dim);">(x${amt})</span></div>
           <div style="font-size:11px; color:var(--text-dim);">${itm.desc}</div>
         </div>
         <button class="btn ghost" style="width:auto; padding:6px 12px;">Equip</button>
@@ -835,15 +837,20 @@ function initBagUI() {
 
 function showEquipSelect(itemKey) {
   const container = document.getElementById("bag-content");
-  let html = `<div class="backrow"><button class="iconbtn" onclick="initBagUI()">←</button><h2>Select Mon for ${ITEMS[itemKey].name}</h2></div>`;
+  const isMaterial = ITEMS[itemKey] && ITEMS[itemKey].slot === "material";
+  const slotType = ITEMS[itemKey] ? ITEMS[itemKey].slot : "accessory";
+  
+  let html = `<div class="backrow"><button class="iconbtn" onclick="initBagUI()">←</button><h2>Equip ${ITEMS[itemKey].name}</h2></div>`;
+  html += `<p class="subtitle">Slot: ${slotType.charAt(0).toUpperCase() + slotType.slice(1)}</p>`;
   html += `<div class="roster-grid">`;
   
   save.mons.forEach(m => {
     const data = getMonData(m.uid);
+    const currentEquip = m.equipment && m.equipment[slotType] ? m.equipment[slotType] : "none";
     html += `
-      <div class="cmon-card" onclick="equipItem('${m.uid}', '${itemKey}')">
+      <div class="cmon-card" onclick="equipItemSlot('${m.uid}', '${itemKey}', '${slotType}')">
         <div class="row1"><div class="orb t-${data.type}"><div class="glyph"></div></div><div><div class="name">${data.name}</div></div></div>
-        <div class="item">Currently: ${ITEMS[data.item]?.name || "None"}</div>
+        <div class="item" style="font-size:10px;">${slotType}: ${ITEMS[currentEquip]?.name || "None"}</div>
       </div>
     `;
   });
@@ -852,19 +859,28 @@ function showEquipSelect(itemKey) {
   container.innerHTML = html;
 }
 
-function equipItem(uid, itemKey) {
+function equipItemSlot(uid, itemKey, slotType) {
   const mSave = save.mons.find(m => m.uid === uid);
+  if (!mSave) return;
   
-  // If they already hold something, put it back in bag
-  if (mSave.heldItem && mSave.heldItem !== "none") {
-    save.bag[mSave.heldItem] = (save.bag[mSave.heldItem] || 0) + 1;
+  if (!mSave.equipment) {
+    mSave.equipment = { weapon: "none", armor: "none", accessory: "none" };
   }
   
-  mSave.heldItem = itemKey;
-  save.bag[itemKey]--;
+  const currentKey = mSave.equipment[slotType] || "none";
+  if (currentKey !== "none") {
+    save.bag[currentKey] = (save.bag[currentKey] || 0) + 1;
+  }
+  
+  mSave.equipment[slotType] = itemKey;
+  save.bag[itemKey] = (save.bag[itemKey] || 1) - 1;
+  if (save.bag[itemKey] <= 0) delete save.bag[itemKey];
+  
+  // heldItem reflects accessory slot (for battle trigger items)
+  mSave.heldItem = mSave.equipment.accessory || "none";
   
   saveGame();
-  alert("Item equipped!");
+  alert(`${ITEMS[itemKey].name} equipped to ${slotType} slot!`);
   initBagUI();
 }
 
@@ -1773,3 +1789,195 @@ function updateDungeonDash() {
 }
 
 setInterval(updateDungeonDash, 5000);
+
+// --- FORGE / CRAFTING SYSTEM ---
+function initForgeUI() {
+  const container = document.getElementById("forge-content");
+  if (!container) return;
+  initForgeTabs();
+  container.innerHTML = "";
+  showCraftTab();
+}
+
+function showCraftTab() {
+  const tabCraft = document.getElementById("forge-tab-craft");
+  const tabEquip = document.getElementById("forge-tab-equip");
+  if (tabCraft) { tabCraft.className = "btn gold"; tabCraft.style.flex = "1"; }
+  if (tabEquip) { tabEquip.className = "btn ghost"; tabEquip.style.flex = "1"; }
+
+  const container = document.getElementById("forge-content");
+  if (!container) return;
+  container.innerHTML = "";
+
+  // Materials section
+  const matSection = document.createElement("div");
+  matSection.className = "details-card";
+  const matKeys = Object.keys(save.bag).filter(k => ITEMS[k] && ITEMS[k].slot === "material" && save.bag[k] > 0);
+  if (matKeys.length > 0) {
+    let matHtml = `<div class="forge-materials-header">🔨 Available Materials</div><div style="display:flex;flex-wrap:wrap;gap:4px;">`;
+    matKeys.forEach(k => {
+      const itm = ITEMS[k];
+      matHtml += `<span class="forge-material-tag have" style="border-color:${TIER_COLORS[itm.tier]||'#888'};">${itm.name} x${save.bag[k]}</span>`;
+    });
+    matHtml += `</div>`;
+    matSection.innerHTML = matHtml;
+  } else {
+    matSection.innerHTML = `<div style="font-size:12px;color:var(--text-dim);text-align:center;">No crafting materials yet. Explore dungeons and expeditions to find materials!</div>`;
+  }
+  container.appendChild(matSection);
+
+  // Recipes
+  CRAFTING_RECIPES.forEach(recipe => {
+    const resultItem = ITEMS[recipe.id];
+    if (!resultItem) return;
+
+    const hasAllMats = recipe.materials.every(mat => (save.bag[mat.key] || 0) >= mat.qty);
+    const canAfford = save.gold >= recipe.goldCost;
+    const canCraft = hasAllMats && canAfford;
+    const tierColor = TIER_COLORS[resultItem.tier] || "#a8a2c4";
+
+    const card = document.createElement("div");
+    card.className = `forge-recipe${canCraft ? ' craftable' : ''}`;
+    card.innerHTML = `
+      <div class="forge-recipe-header">
+        <div class="forge-recipe-name" style="color:${tierColor};">${resultItem.name}</div>
+        <div class="forge-recipe-tier" style="background:${tierColor}22;color:${tierColor};border:1px solid ${tierColor}44;">${TIER_NAMES[resultItem.tier]||resultItem.tier}</div>
+      </div>
+      <div class="forge-recipe-desc">${resultItem.desc}</div>
+      <div style="font-size:11px;color:var(--text-dim);text-transform:capitalize;">Slot: ${resultItem.slot}</div>
+      <div class="forge-recipe-mats">
+        ${recipe.materials.map(mat => {
+          const have = save.bag[mat.key] || 0;
+          const enough = have >= mat.qty;
+          return `<span class="forge-material-tag ${enough ? 'have' : 'need'}">${ITEMS[mat.key]?.name || mat.key} ${have}/${mat.qty}</span>`;
+        }).join("")}
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div class="forge-recipe-cost">🪙 ${formatNum(recipe.goldCost)}</div>
+        <button class="btn gold" style="width:auto;padding:8px 16px;" ${canCraft ? '' : 'disabled'}>
+          ${canCraft ? 'Craft' : hasAllMats ? 'Need Gold' : 'Missing Materials'}
+        </button>
+      </div>
+    `;
+
+    const craftBtn = card.querySelector("button");
+    if (canCraft) {
+      craftBtn.onclick = () => craftItem(recipe);
+    }
+
+    container.appendChild(card);
+  });
+}
+
+function showEquipTab() {
+  const tabCraft = document.getElementById("forge-tab-craft");
+  const tabEquip = document.getElementById("forge-tab-equip");
+  if (tabCraft) { tabCraft.className = "btn ghost"; tabCraft.style.flex = "1"; }
+  if (tabEquip) { tabEquip.className = "btn gold"; tabEquip.style.flex = "1"; }
+
+  const container = document.getElementById("forge-content");
+  if (!container) return;
+  container.innerHTML = "";
+
+  const slotIcons = { weapon: "⚔️", armor: "🛡️", accessory: "💍" };
+
+  save.mons.forEach(m => {
+    const data = getMonData(m.uid);
+    const card = document.createElement("div");
+    card.className = "details-card";
+
+    let slotsHtml = "";
+    EQUIP_SLOTS.forEach(slot => {
+      const eq = m.equipment ? m.equipment[slot] : "none";
+      const eqItem = ITEMS[eq];
+      const eqName = eqItem ? eqItem.name : "None";
+      const eqTier = eqItem && eqItem.tier !== "common" ? eqItem.tier : null;
+      const eqColor = eqTier ? (TIER_COLORS[eqTier] || "#a8a2c4") : "var(--text-dim)";
+
+      slotsHtml += `
+        <div class="forge-equip-slot" data-uid="${m.uid}" data-slot="${slot}">
+          <div class="forge-equip-slot-icon">${slotIcons[slot] || "📦"}</div>
+          <div style="flex:1;">
+            <div class="forge-equip-slot-name">${slot.charAt(0).toUpperCase() + slot.slice(1)}</div>
+            <div class="forge-equip-item" style="color:${eqColor};">${eqName}${eqItem && eqItem.statBonus && Object.keys(eqItem.statBonus).length > 0 ? ` — ${Object.entries(eqItem.statBonus).map(([s,v]) => s.toUpperCase() + "+" + Math.round(v*100) + "%").join(" ")}` : ""}</div>
+          </div>
+          <button class="btn ghost" style="width:auto;padding:6px 12px;font-size:11px;">${eq !== "none" ? 'Unequip' : '—'}</button>
+        </div>
+      `;
+    });
+
+    card.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+        <div class="orb sm t-${data.type}"><div class="glyph"></div></div>
+        <div><div style="font-weight:700;font-size:14px;">${data.name} <span class="badge">Lv.${data.level}</span></div></div>
+      </div>
+      ${slotsHtml}
+    `;
+
+    container.appendChild(card);
+
+    // Unequip handlers
+    card.querySelectorAll(".forge-equip-slot button").forEach(btn => {
+      const slotEl = btn.closest(".forge-equip-slot");
+      const uid = slotEl.dataset.uid;
+      const slot = slotEl.dataset.slot;
+      const mSave = save.mons.find(x => x.uid === uid);
+      const cur = mSave && mSave.equipment ? mSave.equipment[slot] : "none";
+      if (cur !== "none") {
+        btn.onclick = () => {
+          if (mSave.equipment && mSave.equipment[slot] !== "none") {
+            const oldItem = mSave.equipment[slot];
+            save.bag[oldItem] = (save.bag[oldItem] || 0) + 1;
+            mSave.equipment[slot] = "none";
+            mSave.heldItem = mSave.equipment.accessory || "none";
+            saveGame();
+            showEquipTab();
+          }
+        };
+      }
+    });
+  });
+
+  if (save.mons.length === 0) {
+    container.innerHTML = `<p>No Rift-forms available. Summon some first!</p>`;
+  }
+}
+
+function craftItem(recipe) {
+  const resultItem = ITEMS[recipe.id];
+  if (!resultItem) return;
+
+  // Verify materials again
+  for (const mat of recipe.materials) {
+    if ((save.bag[mat.key] || 0) < mat.qty) {
+      return alert("Not enough materials!");
+    }
+  }
+  if (save.gold < recipe.goldCost) {
+    return alert("Not enough gold!");
+  }
+
+  // Consume materials
+  recipe.materials.forEach(mat => {
+    save.bag[mat.key] = (save.bag[mat.key] || 0) - mat.qty;
+    if (save.bag[mat.key] <= 0) delete save.bag[mat.key];
+  });
+
+  save.gold -= recipe.goldCost;
+
+  // Add crafted item to bag
+  save.bag[recipe.id] = (save.bag[recipe.id] || 0) + 1;
+
+  saveGame();
+  alert(`🔨 Crafted ${resultItem.name}!\n\nTier: ${TIER_NAMES[resultItem.tier]}\nSlot: ${resultItem.slot}\n${resultItem.desc}`);
+  showCraftTab();
+  refreshHome();
+}
+
+// Forge tab switching — called once from initForgeUI
+function initForgeTabs() {
+  const tabCraft = document.getElementById("forge-tab-craft");
+  const tabEquip = document.getElementById("forge-tab-equip");
+  if (tabCraft) tabCraft.onclick = showCraftTab;
+  if (tabEquip) tabEquip.onclick = showEquipTab;
+}

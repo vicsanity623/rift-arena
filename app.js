@@ -10,15 +10,53 @@ const MOVES = {
   stone: move("Rock Slam", "stone", 60, 95), gale: move("Wind Slash", "gale", 60, 95)
 };
 
+const TIER_COLORS = { common: "#a8a2c4", uncommon: "#57d68d", rare: "#4facfe", epic: "#c084fc", legendary: "#e6b94d" };
+const TIER_NAMES = { common: "Common", uncommon: "Uncommon", rare: "Rare", epic: "Epic", legendary: "Legendary" };
+const EQUIP_SLOTS = ["weapon", "armor", "accessory"];
+
 const ITEMS = {
-  none: { name: "None", desc: "No item held." },
-  quickfeather: { name: "Quick Feather", desc: "+10% Speed" },
-  ironscale: { name: "Iron Scale", desc: "+15% Defense" },
-  guardcharm: { name: "Guard Charm", desc: "-10% Dmg taken" },
-  vitalberry: { name: "Vital Berry", desc: "Heals 25% at low HP" },
-  steadfastsash: { name: "Steadfast Sash", desc: "Survives lethal hit once" },
-  puredew: { name: "Pure Dew", desc: "Cures all status effects when HP<30%" }
+  none: { name: "None", desc: "No item held.", tier: "common", slot: "any", statBonus: {} },
+  quickfeather: { name: "Quick Feather", desc: "+10% Speed", tier: "uncommon", slot: "accessory", statBonus: {} },
+  ironscale: { name: "Iron Scale", desc: "+15% Defense", tier: "uncommon", slot: "armor", statBonus: {} },
+  guardcharm: { name: "Guard Charm", desc: "-10% Dmg taken", tier: "uncommon", slot: "armor", statBonus: {} },
+  vitalberry: { name: "Vital Berry", desc: "Heals 25% at low HP", tier: "common", slot: "accessory", statBonus: {} },
+  steadfastsash: { name: "Steadfast Sash", desc: "Survives lethal hit once", tier: "rare", slot: "accessory", statBonus: {} },
+  puredew: { name: "Pure Dew", desc: "Cures all status effects when HP<30%", tier: "uncommon", slot: "accessory", statBonus: {} },
+  // Materials
+  iron_ore: { name: "Iron Ore", desc: "A chunk of raw iron. Used in crafting.", tier: "common", slot: "material", statBonus: {} },
+  leather: { name: "Leather", desc: "Tough leather hide. Used in crafting.", tier: "common", slot: "material", statBonus: {} },
+  cloth: { name: "Cloth", desc: "Fine woven cloth. Used in crafting.", tier: "common", slot: "material", statBonus: {} },
+  crystal_shard: { name: "Crystal Shard", desc: "A shimmering crystal fragment.", tier: "uncommon", slot: "material", statBonus: {} },
+  essence_fire: { name: "Fire Essence", desc: "Essence of flame. Used in crafting.", tier: "uncommon", slot: "material", statBonus: {} },
+  essence_water: { name: "Water Essence", desc: "Essence of the deep. Used in crafting.", tier: "uncommon", slot: "material", statBonus: {} },
+  essence_nature: { name: "Nature Essence", desc: "Essence of the wild. Used in crafting.", tier: "uncommon", slot: "material", statBonus: {} },
+  dragon_scale: { name: "Dragon Scale", desc: "A scale from a legendary beast.", tier: "rare", slot: "material", statBonus: {} },
+  rift_core: { name: "Rift Core", desc: "The core of a dimensional rift.", tier: "rare", slot: "material", statBonus: {} },
+  // Crafted Gear
+  leather_bracers: { name: "Leather Bracers", desc: "+5% ATK", tier: "uncommon", slot: "armor", statBonus: { atk: 0.05 } },
+  iron_helm: { name: "Iron Helm", desc: "+8% DEF", tier: "uncommon", slot: "armor", statBonus: { def: 0.08 } },
+  silver_ring: { name: "Silver Ring", desc: "+5% All Stats", tier: "rare", slot: "accessory", statBonus: { hp: 0.05, atk: 0.05, def: 0.05, spd: 0.05 } },
+  flame_sword: { name: "Flame Sword", desc: "+12% ATK", tier: "rare", slot: "weapon", statBonus: { atk: 0.12 } },
+  guardian_plate: { name: "Guardian Plate", desc: "+12% DEF, +5% HP", tier: "rare", slot: "armor", statBonus: { def: 0.12, hp: 0.05 } },
+  swift_boots: { name: "Swift Boots", desc: "+12% SPD", tier: "rare", slot: "accessory", statBonus: { spd: 0.12 } },
+  dragon_amulet: { name: "Dragon Amulet", desc: "+8% All Stats", tier: "epic", slot: "accessory", statBonus: { hp: 0.08, atk: 0.08, def: 0.08, spd: 0.08 } },
+  rift_blade: { name: "Rift Blade", desc: "+20% ATK, +5% SPD", tier: "epic", slot: "weapon", statBonus: { atk: 0.20, spd: 0.05 } },
+  aegis_shield: { name: "Aegis Shield", desc: "+20% DEF, +10% HP", tier: "epic", slot: "armor", statBonus: { def: 0.20, hp: 0.10 } },
+  phoenix_crown: { name: "Phoenix Crown", desc: "+30% All Stats", tier: "legendary", slot: "armor", statBonus: { hp: 0.30, atk: 0.30, def: 0.30, spd: 0.30 } }
 };
+
+const CRAFTING_RECIPES = [
+  { id: "leather_bracers", name: "Leather Bracers", goldCost: 100, materials: [{ key: "leather", qty: 2 }, { key: "cloth", qty: 1 }] },
+  { id: "iron_helm", name: "Iron Helm", goldCost: 150, materials: [{ key: "iron_ore", qty: 3 }, { key: "leather", qty: 1 }] },
+  { id: "silver_ring", name: "Silver Ring", goldCost: 300, materials: [{ key: "crystal_shard", qty: 2 }, { key: "essence_nature", qty: 1 }, { key: "cloth", qty: 1 }] },
+  { id: "flame_sword", name: "Flame Sword", goldCost: 400, materials: [{ key: "iron_ore", qty: 3 }, { key: "essence_fire", qty: 2 }, { key: "leather", qty: 1 }] },
+  { id: "guardian_plate", name: "Guardian Plate", goldCost: 500, materials: [{ key: "iron_ore", qty: 4 }, { key: "leather", qty: 2 }, { key: "crystal_shard", qty: 1 }] },
+  { id: "swift_boots", name: "Swift Boots", goldCost: 350, materials: [{ key: "leather", qty: 3 }, { key: "cloth", qty: 2 }, { key: "essence_water", qty: 1 }] },
+  { id: "dragon_amulet", name: "Dragon Amulet", goldCost: 800, materials: [{ key: "dragon_scale", qty: 1 }, { key: "crystal_shard", qty: 3 }, { key: "essence_fire", qty: 1 }, { key: "essence_water", qty: 1 }] },
+  { id: "rift_blade", name: "Rift Blade", goldCost: 1000, materials: [{ key: "rift_core", qty: 1 }, { key: "crystal_shard", qty: 3 }, { key: "essence_fire", qty: 2 }, { key: "iron_ore", qty: 3 }] },
+  { id: "aegis_shield", name: "Aegis Shield", goldCost: 1200, materials: [{ key: "dragon_scale", qty: 1 }, { key: "iron_ore", qty: 5 }, { key: "crystal_shard", qty: 2 }, { key: "essence_nature", qty: 1 }] },
+  { id: "phoenix_crown", name: "Phoenix Crown", goldCost: 2000, materials: [{ key: "rift_core", qty: 2 }, { key: "dragon_scale", qty: 2 }, { key: "crystal_shard", qty: 5 }, { key: "essence_fire", qty: 3 }, { key: "essence_nature", qty: 3 }] }
+];
 
 const ROSTER_DEF = [
   ["cindrake", "Cindrake", "ember", 70, 65, 55, 70, "quickfeather", "Inferno Pounce", "smooth", 15, "Cindrake Alpha"],
@@ -510,12 +548,12 @@ function generateDefaultSave() {
     dailyQuests: { date: "", quests: [] },
     dailyLogin: { date: "", streak: 0, claimed: false },
     guild: null,
-    bag: { vitalberry: 5, quickfeather: 2, ironscale: 2, puredew: 1 },
+    bag: { vitalberry: 5, quickfeather: 2, ironscale: 2, puredew: 1, iron_ore: 3, leather: 2, cloth: 2 },
     mons: [],
     matchHistory: []
   };
   ["cindrake", "tidenne", "verdil", "sparkit"].forEach((id, i) => {
-    save.mons.push({ uid: "start_" + i, baseId: id, level: 1, xp: 0, heldItem: "none", mergeBonuses: {}, onExpedition: false, evolved: false, variant: null });
+    save.mons.push({ uid: "start_" + i, baseId: id, level: 1, xp: 0, heldItem: "none", equipment: { weapon: "none", armor: "none", accessory: "none" }, mergeBonuses: {}, onExpedition: false, evolved: false, variant: null });
   });
   return save;
 }
@@ -524,7 +562,20 @@ let save = (function () {
   let s;
   try { const raw = localStorage.getItem(SAVE_KEY); if (raw) s = { ...generateDefaultSave(), ...JSON.parse(raw) }; } catch (e) { }
   if (!s) s = generateDefaultSave();
-  s.mons.forEach(m => { if (m.evolved === undefined) m.evolved = false; if (m.variant === undefined) m.variant = null; });
+  s.mons.forEach(m => {
+    if (m.evolved === undefined) m.evolved = false;
+    if (m.variant === undefined) m.variant = null;
+    if (m.equipment === undefined) {
+      const itemKey = m.heldItem || "none";
+      m.equipment = { weapon: "none", armor: "none", accessory: "none" };
+      if (itemKey !== "none" && ITEMS[itemKey]) {
+        const slot = ITEMS[itemKey].slot;
+        if (slot && slot !== "material") { m.equipment[slot] = itemKey; }
+      }
+    }
+    if (m.heldItem === undefined) m.heldItem = "none";
+    m.heldItem = m.equipment.accessory || "none";
+  });
   if (!s.matchHistory) s.matchHistory = [];
   if (!s.shopStock) s.shopStock = null;
   if (!s.dailyLogin) s.dailyLogin = { date: "", streak: 0, claimed: false };
@@ -547,6 +598,20 @@ function getMonData(uid) {
   const defBonus = 1 + (mSave.mergeBonuses.def || 0);
   const spdBonus = 1 + (mSave.mergeBonuses.spd || 0);
 
+  // Equipment stat bonuses
+  const equip = mSave.equipment || { weapon: "none", armor: "none", accessory: "none" };
+  let equipHp = 0, equipAtk = 0, equipDef = 0, equipSpd = 0;
+  EQUIP_SLOTS.forEach(slot => {
+    const key = equip[slot];
+    if (key && key !== "none" && ITEMS[key]) {
+      const sb = ITEMS[key].statBonus || {};
+      if (sb.hp) equipHp += sb.hp;
+      if (sb.atk) equipAtk += sb.atk;
+      if (sb.def) equipDef += sb.def;
+      if (sb.spd) equipSpd += sb.spd;
+    }
+  });
+
   const variantKey = mSave.variant || null;
   const variantDef = variantKey ? VARIANTS[variantKey] : null;
   const vMod = variantDef ? variantDef.statMods : { hp: 1, atk: 1, def: 1, spd: 1 };
@@ -561,10 +626,10 @@ function getMonData(uid) {
 
   return {
     uid: mSave.uid, baseId: def[0], name: displayName, type: displayType,
-    baseHp: Math.floor(def[3] * scale * hpBonus * vMod.hp * evoMult),
-    atk: Math.floor(def[4] * scale * atkBonus * vMod.atk * evoMult),
-    def: Math.floor(def[5] * scale * defBonus * vMod.def * evoMult),
-    spd: Math.floor(def[6] * scale * spdBonus * vMod.spd * evoMult),
+    baseHp: Math.floor(def[3] * scale * hpBonus * vMod.hp * evoMult * (1 + equipHp)),
+    atk: Math.floor(def[4] * scale * atkBonus * vMod.atk * evoMult * (1 + equipAtk)),
+    def: Math.floor(def[5] * scale * defBonus * vMod.def * evoMult * (1 + equipDef)),
+    spd: Math.floor(def[6] * scale * spdBonus * vMod.spd * evoMult * (1 + equipSpd)),
     item: mSave.heldItem, sigName: def[8], shape: def[9],
     level: lvl, xp: mSave.xp, onExpedition: mSave.onExpedition,
     maxXp: getMonMaxXp(lvl),
@@ -730,6 +795,7 @@ document.getElementById("card-summon").addEventListener("click", () => {
 // Hooks to systems.js
 document.getElementById("card-explore").addEventListener("click", () => { initExploreUI(); show("screen-explore"); });
 document.getElementById("card-merge").addEventListener("click", () => { initMergeUI(); show("screen-merge"); });
+document.getElementById("card-forge").addEventListener("click", () => { if (typeof initForgeUI === "function") initForgeUI(); show("screen-forge"); });
 document.getElementById("card-bag").addEventListener("click", () => { initBagUI(); show("screen-bag"); });
 if (document.getElementById("card-shop")) document.getElementById("card-shop").addEventListener("click", () => { initShopUI(); show("screen-shop"); });
 if (document.getElementById("card-dojo")) document.getElementById("card-dojo").addEventListener("click", () => { initDojoUI(); show("screen-dojo"); });
@@ -865,7 +931,11 @@ function showMonDetails(m) {
     </div>
     
     <div style="font-size:12px; color:var(--text-dim); text-align:center; margin-top:10px;">
-      Held item: ${ITEMS[m.item].name} — ${ITEMS[m.item].desc}
+      ${EQUIP_SLOTS.map(s => {
+        const saveM = save.mons.find(x => x.uid === m.uid);
+        const key = saveM && saveM.equipment ? saveM.equipment[s] : "none";
+        return `<span style="margin:0 4px;">${s.charAt(0).toUpperCase()+s.slice(1)}: ${ITEMS[key]?ITEMS[key].name:"None"}</span>`;
+      }).join(" | ")}
     </div>
     ${m.evolved ? `<div style="font-size:11px; color:var(--gold-dim); text-align:center; margin-top:6px;">✦ Evolution Passive Boost: ${m.passiveDesc || (getPassive(m.type) ? getPassive(m.type).desc : '')}</div>` : (() => { const pa = getPassive(m.type); return pa ? `<div style="font-size:11px; color:var(--xp-blue); text-align:center; margin-top:6px;">${pa.icon} Passive: ${pa.name} — ${m.passiveDesc || pa.desc}</div>` : ""; })()}
     
