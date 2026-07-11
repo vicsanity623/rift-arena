@@ -440,3 +440,17 @@ select.btn.ghost option { background: var(--bg); color: white; }
 .dungeon-floor-end-banner.boss{ color:var(--gold); text-shadow:0 0 20px rgba(230,185,77,.4); }
 .dungeon-floor-end-rewards{ background:var(--card-hi); border:1px solid var(--line); border-radius:14px; padding:18px; min-width:220px; display:flex; flex-direction:column; gap:6px; }
 .dungeon-floor-end-actions{ display:flex; flex-direction:column; gap:8px; margin-top:12px; }
+
+/* Guild Perks List */
+.guild-perks-list{ display:flex; flex-direction:column; gap:6px; }
+.guild-perk{ display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:10px; background:var(--card); border:1px solid var(--line); }
+.guild-perk.owned{ border-color:var(--safe); background:rgba(87,214,141,0.06); }
+.guild-perk.available{ border-color:var(--gold); background:rgba(230,185,77,0.06); }
+.guild-perk.locked{ opacity:0.5; filter:grayscale(50%); }
+.guild-perk-icon{ font-size:20px; width:28px; text-align:center; }
+.guild-perk-info{ flex:1; min-width:0; }
+.guild-perk-name{ font-weight:700; font-size:13px; }
+.guild-perk-desc{ font-size:10px; color:var(--text-dim); font-family:var(--mono); }
+.guild-perk-status{ font-size:10px; font-family:var(--mono); color:var(--text-dim); white-space:nowrap; }
+.guild-perk.owned .guild-perk-status{ color:var(--safe); }
+.guild-perk.available .guild-perk-status{ color:var(--gold); }
