@@ -688,6 +688,24 @@ function claimExplore() {
   save.gems += gemsGained;
   save.vp += vpGained;
   
+  // Crafting materials scaled by duration
+  const materials = {
+    iron_ore: Math.floor(dur / 30) + 1,
+    leather: Math.floor(dur / 30) + 1,
+    cloth: Math.floor(dur / 30) + 1,
+    crystal_shard: dur >= 120 ? 2 : dur >= 30 ? 1 : 0,
+    essence_nature: dur >= 120 ? 1 : 0
+  };
+  let matMsg = "";
+  Object.keys(materials).forEach(key => {
+    const qty = materials[key];
+    if (qty > 0) {
+      if (!save.bag[key]) save.bag[key] = 0;
+      save.bag[key] += qty;
+      matMsg += `\n${ITEMS[key].name} x${qty}`;
+    }
+  });
+  
   let rareMsg = "";
   // 10% chance per 30 mins to find a rare spawn
   if (Math.random() < (dur / 300)) { 
@@ -699,9 +717,10 @@ function claimExplore() {
   }
   
   save.explore = { active: false };
+  if (typeof trackQuestProgress === "function") trackQuestProgress("explore", 1);
   saveGame();
   
-  alert(`Expedition complete!\n\n${xpGained} Mon XP\n${formatNum(goldGained)} Gold\n${formatNum(gemsGained)} Gems\n${vpGained} VP${rareMsg}`);
+  alert(`Expedition complete!\n\n${xpGained} Mon XP\n${formatNum(goldGained)} Gold\n${formatNum(gemsGained)} Gems\n${vpGained} VP${matMsg}${rareMsg}`);
   refreshHome();
   show("screen-home");
 }
