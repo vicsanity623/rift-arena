@@ -1,5 +1,37 @@
 "use strict";
 
+// --- CUSTOM MODAL NOTIFICATION SYSTEM ---
+function showModal(opts) {
+  const overlay = document.getElementById("modal-overlay");
+  if (!overlay) return;
+  const title = opts.title || "Notification";
+  const icon = opts.icon || "📢";
+  const message = opts.message || "";
+  const buttons = opts.buttons || [{ label: "OK", primary: true }];
+  const modalTitle = document.getElementById("modal-title");
+  const modalIcon = document.getElementById("modal-icon");
+  const modalBody = document.getElementById("modal-body");
+  const modalFooter = document.getElementById("modal-footer");
+  if (modalIcon) modalIcon.textContent = icon;
+  if (modalTitle) modalTitle.textContent = title;
+  if (modalBody) modalBody.innerHTML = message;
+  if (modalFooter) {
+    modalFooter.innerHTML = "";
+    buttons.forEach((btn, idx) => {
+      const b = document.createElement("button");
+      b.className = "modal-btn" + (btn.primary ? " primary" : " secondary");
+      b.textContent = btn.label || "OK";
+      b.onclick = () => {
+        overlay.classList.remove("active");
+        if (btn.action) setTimeout(btn.action, 50);
+        else if (btn.callback) setTimeout(btn.callback, 50);
+      };
+      modalFooter.appendChild(b);
+    });
+  }
+  overlay.classList.add("active");
+}
+
 // --- DAILY LOGIN REWARDS ---
 const DAILY_LOGIN_REWARDS = [
   { day: 1,  items: [{ type: "gold", amount: 100 }, { type: "gems", amount: 10 }] },
@@ -35,7 +67,7 @@ function isConsecutiveDay(lastDate, today) {
 
 function claimDailyLogin() {
   ensureDailyLogin();
-  if (save.dailyLogin.claimed) return alert("Daily reward already claimed today.");
+  if (save.dailyLogin.claimed) return showModal({ icon: "🎁", title: "Daily Login", message: "Daily reward already claimed today." });
 
   const dayIdx = ((save.dailyLogin.streak - 1) % 7);
   const reward = DAILY_LOGIN_REWARDS[dayIdx];
@@ -118,7 +150,7 @@ function initDailyLoginUI() {
           if (it.type === "item") return `${ITEMS[it.key] ? ITEMS[it.key].name : it.key}`;
           return "";
         }).join(", ");
-        alert(`🎉 Day ${result.streak} Login Bonus claimed!\n\nReceived: ${rewardDesc}`);
+        showModal({ icon: "🎉", title: `Day ${result.streak} Login Bonus`, message: `Received: ${rewardDesc}` });
         initDailyLoginUI();
       }
     };
@@ -241,7 +273,7 @@ function claimQuestReward(index) {
   saveGame();
   refreshHome();
   initQuestsUI();
-  alert(`Quest complete!\n\nRewards:\n🪙 ${formatNum(q.reward.gold)} Gold\n💎 ${formatNum(q.reward.gems)} Gems`);
+  showModal({ icon: "📋", title: "Quest Complete!", message: `Rewards:<br>🪙 ${formatNum(q.reward.gold)} Gold<br>💎 ${formatNum(q.reward.gems)} Gems` });
 }
 
 // --- TRAINING DOJO SYSTEM ---
@@ -326,11 +358,11 @@ function initDojoUI() {
     document.getElementById("btn-start-dojo").onclick = () => {
       const uid = document.getElementById("dojo-mon-select").value;
       const typeEl = document.querySelector('input[name="dojo-type"]:checked');
-      if (!typeEl) return alert("Select a training type.");
+      if (!typeEl) return showModal({ icon: "🥋", title: "Dojo", message: "Select a training type." });
       const type = typeEl.value;
       const training = DOJO_TRAININGS[type];
 
-      if (save.gold < training.goldCost) return alert(`Not enough gold. Need ${training.goldCost} 🪙.`);
+      if (save.gold < training.goldCost) return showModal({ icon: "🪙", title: "Not Enough Gold", message: `Not enough gold. Need ${training.goldCost} 🪙.` });
 
       save.gold -= training.goldCost;
       const monState = save.mons.find(m => m.uid === uid);
@@ -366,7 +398,7 @@ function claimDojo() {
   save.dojo = { active: false };
   saveGame();
 
-  alert(`Training complete!\n\n${mSave.baseId} gained ${xpGained} XP\n${formatNum(goldGained)} Gold earned`);
+  showModal({ icon: "🥋", title: "Training Complete!", message: `${mSave.baseId} gained ${xpGained} XP<br>${formatNum(goldGained)} Gold earned` });
   refreshHome();
   show("screen-home");
 }
@@ -376,7 +408,7 @@ let survivalState = null;
 
 function startSurvivalMode() {
   const pData = pickOrder.map(uid => getMonData(uid));
-  if (pData.length !== 3) return alert("Select 3 Rift-forms first.");
+  if (pData.length !== 3) return showModal({ icon: "⚠️", title: "Team Selection", message: "Select 3 Rift-forms first." });
 
   const avgLevel = Math.max(1, Math.floor(pData.reduce((s, m) => s + m.level, 0) / 3));
 
@@ -552,7 +584,7 @@ function showSurvivalWaveEndUI(waveRewards) {
 function survivalLost() {
   survivalState.over = true;
   const survived = survivalState.wave - 1;
-  alert(`Defeated at Wave ${survivalState.wave}!\n\nYou earned ${formatNum(survivalState.rewards.gold)} Gold, ${formatNum(survivalState.rewards.gems)} Gems over ${survived} waves.`);
+  showModal({ icon: "💀", title: `Defeated at Wave ${survivalState.wave}`, message: `You earned ${formatNum(survivalState.rewards.gold)} Gold, ${formatNum(survivalState.rewards.gems)} Gems over ${survived} waves.` });
   survivalState = null;
   pickOrder = [];
   refreshHome();
@@ -561,8 +593,7 @@ function survivalLost() {
 
 function survivalComplete() {
   const waves = survivalState.wave - 1;
-  const msg = `Survival complete! Cleared ${waves} waves.\n\nFinal Rewards: 🪙${formatNum(survivalState.rewards.gold)} 💎${formatNum(survivalState.rewards.gems)}`;
-  alert(msg);
+  showModal({ icon: "🏆", title: "Survival Complete!", message: `Cleared ${waves} waves.<br><br>Final Rewards: 🪙${formatNum(survivalState.rewards.gold)} 💎${formatNum(survivalState.rewards.gems)}` });
   playVictorySound();
   survivalState = null;
   pickOrder = [];
@@ -720,7 +751,7 @@ function claimExplore() {
   if (typeof trackQuestProgress === "function") trackQuestProgress("explore", 1);
   saveGame();
   
-  alert(`Expedition complete!\n\n${xpGained} Mon XP\n${formatNum(goldGained)} Gold\n${formatNum(gemsGained)} Gems\n${vpGained} VP${matMsg}${rareMsg}`);
+  showModal({ icon: "🗺️", title: "Expedition Complete!", message: `${xpGained} Mon XP<br>${formatNum(goldGained)} Gold<br>${formatNum(gemsGained)} Gems<br>${vpGained} VP${matMsg.replace(/\n/g, "<br>")}${rareMsg}` });
   refreshHome();
   show("screen-home");
 }
@@ -808,7 +839,7 @@ function initMergeUI() {
         }
         
         saveGame();
-        alert(`Merge successful!\n3 duplicates destroyed.\nYour strongest ${def[1]} gained +5% bonuses in: ${boostLog.join(", ")}`);
+        showModal({ icon: "🧬", title: "Merge Successful!", message: `3 duplicates destroyed.<br>Your strongest ${def[1]} gained +5% bonuses in: ${boostLog.join(", ")}` });
         initMergeUI();
       };
       
@@ -899,7 +930,7 @@ function equipItemSlot(uid, itemKey, slotType) {
   mSave.heldItem = mSave.equipment.accessory || "none";
   
   saveGame();
-  alert(`${ITEMS[itemKey].name} equipped to ${slotType} slot!`);
+  showModal({ icon: "🎒", title: "Equipment", message: `${ITEMS[itemKey].name} equipped to ${slotType} slot!` });
   initBagUI();
 }
 
@@ -963,7 +994,7 @@ function initShopUI() {
       save.bag[freeItem] = (save.bag[freeItem] || 0) + 1;
       save.shopStock.freeClaimed = true;
       saveGame();
-      alert(`🎁 Free item claimed: ${ITEMS[freeItem].name}!`);
+      showModal({ icon: "🎁", title: "Free Item", message: `${ITEMS[freeItem].name} claimed!` });
       initShopUI();
     };
   }
@@ -1002,18 +1033,18 @@ function purchaseShopItem(idx) {
   if (!item || item.stock <= 0) return;
 
   if (item.key === "gems_pack") {
-    if (save.gold < item.priceGold) return alert("Not enough gold!");
+    if (save.gold < item.priceGold) return showModal({ icon: "🪙", title: "Not Enough Gold", message: "Not enough gold!" });
     save.gold -= item.priceGold;
     save.gems += 50;
   } else {
-    if (save.gold < item.priceGold) return alert("Not enough gold!");
+    if (save.gold < item.priceGold) return showModal({ icon: "🪙", title: "Not Enough Gold", message: "Not enough gold!" });
     save.gold -= item.priceGold;
     save.bag[item.key] = (save.bag[item.key] || 0) + 1;
   }
 
   item.stock--;
   saveGame();
-  alert(`Purchased ${item.name}!`);
+  showModal({ icon: "🏪", title: "Purchase Complete", message: `Purchased ${item.name}!` });
   initShopUI();
   refreshHome();
 }
@@ -1111,13 +1142,13 @@ function initLabUI() {
   document.getElementById("btn-breed").onclick = () => {
     const uid1 = document.getElementById("lab-parent1").value;
     const uid2 = document.getElementById("lab-parent2").value;
-    if (uid1 === uid2) return alert("Select two different parents!");
+    if (uid1 === uid2) return showModal({ icon: "🧬", title: "Breeding Lab", message: "Select two different parents!" });
 
     const m1 = save.mons.find(m => m.uid === uid1);
     const m2 = save.mons.find(m => m.uid === uid2);
     if (!m1 || !m2) return;
 
-    if (save.gold < breedCost) return alert("Not enough gold!");
+    if (save.gold < breedCost) return showModal({ icon: "🪙", title: "Not Enough Gold", message: "Not enough gold!" });
     save.gold -= breedCost;
 
     const def1 = ROSTER_DEF.find(r => r[0] === m1.baseId);
@@ -1139,7 +1170,7 @@ function initLabUI() {
     });
 
     saveGame();
-    alert(`🧬 Gene Synthesis complete!\n\nBoth parents fused into a rare Variant:\n${vDef.icon} ${vDef.name} ${chosenDef[1]} (Lv.1)!`);
+    showModal({ icon: "🧬", title: "Gene Synthesis Complete!", message: `Both parents fused into a rare Variant:<br>${vDef.icon} ${vDef.name} ${chosenDef[1]} (Lv.1)!` });
     refreshHome();
     initLabUI();
   };
@@ -1227,7 +1258,7 @@ function showGuildCreate(container) {
   `;
 
   document.getElementById("btn-create-guild").onclick = () => {
-    if (save.gold < createCost) return alert(`Not enough gold. Need ${formatNum(createCost)} 🪙.`);
+    if (save.gold < createCost) return showModal({ icon: "🪙", title: "Not Enough Gold", message: `Not enough gold. Need ${formatNum(createCost)} 🪙.` });
     const name = document.getElementById("guild-name-select").value;
     const perk = document.getElementById("guild-perk-select").value;
 
@@ -1246,7 +1277,7 @@ function showGuildCreate(container) {
     refreshHome();
     initGuildUI();
     const val = getGuildPerkValue(perk, 1);
-    alert(`🏴 Guild "${name}" created!\n\nPerk: ${GUILD_PERK_DEFS[perk].name}\n${getGuildPerkDesc(perk, 1)}`);
+    showModal({ icon: "🏴", title: "Guild Created!", message: `Guild "${name}" created!<br><br>Perk: ${GUILD_PERK_DEFS[perk].name}<br>${getGuildPerkDesc(perk, 1)}` });
   };
 }
 
@@ -1308,7 +1339,7 @@ function showGuildDashboard(container) {
       if (newlyUnlocked.length > 0) {
         newlyUnlocked.forEach(k => { if (!g.perks.includes(k)) g.perks.push(k); });
         saveGame();
-        alert(`✨ New guild perks activated!\n\n${newlyUnlocked.map(k => `${GUILD_PERK_DEFS[k].icon} ${GUILD_PERK_DEFS[k].name}: ${getGuildPerkDesc(k, g.level)}`).join("\n")}`);
+        showModal({ icon: "✨", title: "New Guild Perks!", message: `${newlyUnlocked.map(k => `${GUILD_PERK_DEFS[k].icon} ${GUILD_PERK_DEFS[k].name}: ${getGuildPerkDesc(k, g.level)}`).join("<br>")}` });
         refreshHome();
         initGuildUI();
       }
@@ -1316,7 +1347,7 @@ function showGuildDashboard(container) {
   }
 
   document.getElementById("btn-guild-donate").onclick = () => {
-    if (save.gold < 100) return alert("Need 100 gold to donate.");
+    if (save.gold < 100) return showModal({ icon: "🪙", title: "Not Enough Gold", message: "Need 100 gold to donate." });
     save.gold -= 100;
     save.guild.donated += 100;
     save.guild.xp += 50;
@@ -1327,19 +1358,19 @@ function showGuildDashboard(container) {
     }
     if (save.guild.level > prevLevel) {
       const newUnlocked = getUnlockedPerks(save.guild.level).filter(k => !save.guild.perks.includes(k));
-      let msg = `🏴 Guild leveled up to Lv.${save.guild.level}!`;
+      let msg = `Guild leveled up to Lv.${save.guild.level}!`;
       if (newUnlocked.length > 0) {
-        msg += `\n\nNew perks available:\n${newUnlocked.map(k => `${GUILD_PERK_DEFS[k].icon} ${GUILD_PERK_DEFS[k].name}`).join("\n")}`;
+        msg += `<br><br>New perks available:<br>${newUnlocked.map(k => `${GUILD_PERK_DEFS[k].icon} ${GUILD_PERK_DEFS[k].name}`).join("<br>")}`;
       }
       saveGame();
       refreshHome();
       initGuildUI();
-      alert(msg);
+      showModal({ icon: "🏴", title: "Guild Level Up!", message: msg });
     } else {
       saveGame();
       refreshHome();
       initGuildUI();
-      alert(`Donated 100 🪙 to the guild! Guild gained 50 XP.`);
+      showModal({ icon: "🏴", title: "Donation", message: "Donated 100 🪙 to the guild! Guild gained 50 XP." });
     }
   };
 }
@@ -1436,7 +1467,7 @@ function showDungeonSelect(container) {
       const idx = parseInt(card.dataset.dungeonIdx);
       const dd = DUNGEON_DEFS[idx];
       if (save.mons.filter(m => !m.onExpedition).length < 3) {
-        return alert("You need at least 3 available Rift-forms to enter a dungeon.");
+        return showModal({ icon: "🏛️", title: "Dungeon", message: "You need at least 3 available Rift-forms to enter a dungeon." });
       }
       buildSelectGrid();
       battleMode = "dungeon";
@@ -1752,7 +1783,7 @@ function dungeonRetreat() {
   refreshHome();
 
   document.getElementById("screen-dungeon-floor-end").classList.remove("active");
-  alert(msg);
+  showModal({ icon: "🏛️", title: "Dungeon Retreat", message: msg.replace(/\n/g, "<br>") });
   show("screen-home");
 }
 
@@ -1773,7 +1804,7 @@ function dungeonComplete() {
 
   playVictorySound();
   refreshHome();
-  alert(msg);
+  showModal({ icon: "🏆", title: "Dungeon Conquered!", message: msg.replace(/\n/g, "<br>") });
   document.getElementById("screen-dungeon-floor-end").classList.remove("active");
   show("screen-home");
 }
@@ -1969,11 +2000,11 @@ function craftItem(recipe) {
   // Verify materials again
   for (const mat of recipe.materials) {
     if ((save.bag[mat.key] || 0) < mat.qty) {
-      return alert("Not enough materials!");
+      return showModal({ icon: "🔨", title: "Crafting", message: "Not enough materials!" });
     }
   }
   if (save.gold < recipe.goldCost) {
-    return alert("Not enough gold!");
+    return showModal({ icon: "🪙", title: "Not Enough Gold", message: "Not enough gold!" });
   }
 
   // Consume materials
@@ -1988,7 +2019,7 @@ function craftItem(recipe) {
   save.bag[recipe.id] = (save.bag[recipe.id] || 0) + 1;
 
   saveGame();
-  alert(`🔨 Crafted ${resultItem.name}!\n\nTier: ${TIER_NAMES[resultItem.tier]}\nSlot: ${resultItem.slot}\n${resultItem.desc}`);
+  showModal({ icon: "🔨", title: "Crafted!", message: `Crafted ${resultItem.name}!<br><br>Tier: ${TIER_NAMES[resultItem.tier]}<br>Slot: ${resultItem.slot}<br>${resultItem.desc}` });
   showCraftTab();
   refreshHome();
 }

@@ -767,13 +767,13 @@ document.getElementById("card-idle").addEventListener("click", () => {
   if (mins > 0) {
     const earned = mins * 3;
     save.gold += earned; save.lastIdleClaim = Date.now(); saveGame();
-    alert(`Claimed ${formatNum(earned)} Gold from Idle Base!`);
+    showModal({ icon: "🪙", title: "Idle Base", message: `Claimed ${formatNum(earned)} Gold from Idle Base!` });
     refreshHome();
-  } else alert("Too soon to claim again. Base generates gold over time.");
+  } else showModal({ icon: "⏳", title: "Idle Base", message: "Too soon to claim again. Base generates gold over time." });
 });
 
 document.getElementById("card-summon").addEventListener("click", () => {
-  if (save.gems < 100) return alert("Not enough gems. Earn gems by exploring or leveling up!");
+  if (save.gems < 100) return showModal({ icon: "💎", title: "Not Enough Gems", message: "Not enough gems. Earn gems by exploring or leveling up!" });
   save.gems -= 100;
 
   const choice = ROSTER_DEF[Math.floor(Math.random() * ROSTER_DEF.length)];
@@ -789,7 +789,7 @@ document.getElementById("card-summon").addEventListener("click", () => {
   if (typeof trackQuestProgress === "function") trackQuestProgress("summon", 1);
   saveGame(); refreshHome();
   const vTag = variant ? " " + VARIANTS[variant].icon + " " + VARIANTS[variant].name : "";
-  alert(`✨ Summoned a new${vTag} ${choice[1]}! Added to roster.`);
+  showModal({ icon: "✨", title: "Summon Complete", message: `Summoned a new${vTag} ${choice[1]}! Added to roster.` });
 });
 
 // Hooks to systems.js
@@ -801,7 +801,7 @@ if (document.getElementById("card-shop")) document.getElementById("card-shop").a
 if (document.getElementById("card-dojo")) document.getElementById("card-dojo").addEventListener("click", () => { initDojoUI(); show("screen-dojo"); });
 
 document.getElementById("card-battle").addEventListener("click", () => {
-  if (save.mons.filter(m => !m.onExpedition).length < 3) return alert("You need at least 3 Rift-forms available to battle.");
+  if (save.mons.filter(m => !m.onExpedition).length < 3) return showModal({ icon: "⚠️", title: "Cannot Battle", message: "You need at least 3 Rift-forms available to battle." });
   buildSelectGrid();
   show("screen-select");
   document.getElementById("btn-confirm-team").textContent = "Find Ranked Match";
@@ -839,7 +839,7 @@ function showTournamentInfo() {
     </div>
   `;
   document.getElementById("btn-enter-tourney").onclick = () => {
-    if (save.gems < 50) return alert(`Not enough Gems! Need 50 💎.`);
+    if (save.gems < 50) return showModal({ icon: "💎", title: "Not Enough Gems", message: `Not enough Gems! Need 50 💎.` });
     buildSelectGrid();
     battleMode = "tournament";
     if (document.getElementById("btn-tournament-team")) document.getElementById("btn-tournament-team").style.display = "none";
@@ -946,7 +946,7 @@ function showMonDetails(m) {
   show("screen-details");
 
   document.getElementById("btn-lvlup").onclick = () => {
-    if (save.gold < upgCost) return alert("Not enough gold.");
+    if (save.gold < upgCost) return showModal({ icon: "🪙", title: "Not Enough Gold", message: "Not enough gold." });
     save.gold -= upgCost;
     const mSave = save.mons.find(x => x.uid === m.uid);
     mSave.level++;
@@ -1280,7 +1280,7 @@ var tournamentState = null;
 
 function startTournamentMode(playerUids) {
   const entryFee = 50;
-  if (save.gems < entryFee) return alert(`Tournament entry requires ${entryFee} Gems. You have ${save.gems}.`);
+  if (save.gems < entryFee) return showModal({ icon: "🏆", title: "Entry Fee", message: `Tournament entry requires ${entryFee} Gems. You have ${save.gems}.` });
 
   const pData = playerUids.map(uid => getMonData(uid));
   const avgLevel = Math.max(1, Math.floor(pData.reduce((s, m) => s + m.level, 0) / 3));
