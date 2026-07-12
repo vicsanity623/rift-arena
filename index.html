@@ -107,6 +107,11 @@
         <div class="label">Leaderboard</div>
         <div class="desc">Rankings</div>
       </div>
+      <div class="dash-card" id="card-achievements">
+        <div class="icon-bg">🏆</div>
+        <div class="label">Achievements</div>
+        <div class="desc">Milestones</div>
+      </div>
       <div class="dash-card" id="card-lab">
         <div class="icon-bg">🧬</div>
         <div class="label">Breeding Lab</div>
@@ -246,6 +251,13 @@
   <section class="screen" id="screen-leaderboard">
     <div class="backrow"><button class="iconbtn" data-back="screen-home">←</button><h2>PvP Leaderboard</h2></div>
     <div id="leaderboard-content" style="flex:1; overflow-y:auto;"></div>
+  </section>
+
+  <!-- ACHIEVEMENTS -->
+  <section class="screen" id="screen-achievements">
+    <div class="backrow"><button class="iconbtn" data-back="screen-home">←</button><h2>Achievements</h2></div>
+    <p class="subtitle">Complete milestones across categories to earn gems and gold rewards!</p>
+    <div id="achievements-content" style="flex:1; display:flex; flex-direction:column; gap:12px; overflow-y:auto;"></div>
   </section>
 
   <!-- BREEDING LAB -->

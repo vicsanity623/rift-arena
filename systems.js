@@ -396,6 +396,7 @@ function claimDojo() {
   }
 
   save.dojo = { active: false };
+  if (typeof trackAchievement === "function") trackAchievement("dojo_hours", training.durMs);
   saveGame();
 
   showModal({ icon: "🥋", title: "Training Complete!", message: `${mSave.baseId} gained ${xpGained} XP<br>${formatNum(goldGained)} Gold earned` });
@@ -749,6 +750,11 @@ function claimExplore() {
   
   save.explore = { active: false };
   if (typeof trackQuestProgress === "function") trackQuestProgress("explore", 1);
+  if (typeof trackAchievement === "function") trackAchievement("explore_complete", 1);
+  if (typeof trackAchievement === "function") {
+    const totalMats = Object.keys(materials).reduce((s, k) => s + materials[k], 0);
+    if (totalMats > 0) trackAchievement("materials_found", totalMats);
+  }
   saveGame();
   
   showModal({ icon: "🗺️", title: "Expedition Complete!", message: `${xpGained} Mon XP<br>${formatNum(goldGained)} Gold<br>${formatNum(gemsGained)} Gems<br>${vpGained} VP${matMsg.replace(/\n/g, "<br>")}${rareMsg}` });
@@ -928,8 +934,9 @@ function equipItemSlot(uid, itemKey, slotType) {
   
   // heldItem reflects accessory slot (for battle trigger items)
   mSave.heldItem = mSave.equipment.accessory || "none";
-  
+
   saveGame();
+  if (typeof trackAchievement === "function") trackAchievement("gear_equipped", 1);
   showModal({ icon: "🎒", title: "Equipment", message: `${ITEMS[itemKey].name} equipped to ${slotType} slot!` });
   initBagUI();
 }
@@ -2019,6 +2026,7 @@ function craftItem(recipe) {
   save.bag[recipe.id] = (save.bag[recipe.id] || 0) + 1;
 
   saveGame();
+  if (typeof trackAchievement === "function") trackAchievement("item_forged", 1);
   showModal({ icon: "🔨", title: "Crafted!", message: `Crafted ${resultItem.name}!<br><br>Tier: ${TIER_NAMES[resultItem.tier]}<br>Slot: ${resultItem.slot}<br>${resultItem.desc}` });
   showCraftTab();
   refreshHome();

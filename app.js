@@ -80,6 +80,46 @@ const VARIANTS = {
   toxic: { name: "Toxic", icon: "☠️", desc: "Poison-infused, high SPD+ATK", statMods: { spd: 1.25, atk: 1.15, def: 0.9, hp: 0.95 } }
 };
 
+const ACHIEVEMENT_CATEGORIES = {
+  battle: { name: "Battle", icon: "⚔️", color: "#ff6a45" },
+  collection: { name: "Collection", icon: "🐾", color: "#c084fc" },
+  exploration: { name: "Exploration", icon: "🗺️", color: "#4facfe" },
+  crafting: { name: "Crafting", icon: "🔨", color: "#f4c74c" },
+  dojo: { name: "Dojo", icon: "🥋", color: "#57d68d" }
+};
+
+const ACHIEVEMENTS = [
+  { id: "battle_wins_1", category: "battle", name: "First Blood", desc: "Win 1 battle", target: 1, reward: { gold: 50, gems: 5 } },
+  { id: "battle_wins_10", category: "battle", name: "Skirmisher", desc: "Win 10 battles", target: 10, reward: { gold: 200, gems: 20 } },
+  { id: "battle_wins_50", category: "battle", name: "Warrior", desc: "Win 50 battles", target: 50, reward: { gold: 500, gems: 50 } },
+  { id: "battle_wins_100", category: "battle", name: "Veteran", desc: "Win 100 battles", target: 100, reward: { gold: 1000, gems: 100 } },
+  { id: "battle_wins_500", category: "battle", name: "Legend", desc: "Win 500 battles", target: 500, reward: { gold: 5000, gems: 500 } },
+  { id: "battle_streak_5", category: "battle", name: "On Fire", desc: "Win 5 in a row", target: 5, reward: { gold: 300, gems: 30 } },
+  { id: "battle_streak_10", category: "battle", name: "Unstoppable", desc: "Win 10 in a row", target: 10, reward: { gold: 600, gems: 60 } },
+  { id: "battle_vp_2000", category: "battle", name: "VP Collector", desc: "Reach 2000 VP", target: 2000, reward: { gold: 400, gems: 40 } },
+  { id: "battle_vp_5000", category: "battle", name: "VP Elite", desc: "Reach 5000 VP", target: 5000, reward: { gold: 1000, gems: 100 } },
+  { id: "battle_vp_10000", category: "battle", name: "VP Legend", desc: "Reach 10000 VP", target: 10000, reward: { gold: 2500, gems: 250 } },
+  { id: "collect_5", category: "collection", name: "Collector", desc: "Own 5 unique creatures", target: 5, reward: { gold: 100, gems: 10 } },
+  { id: "collect_12", category: "collection", name: "Menagerie", desc: "Own all 12 creature types", target: 12, reward: { gold: 500, gems: 50 } },
+  { id: "variant_1", category: "collection", name: "Variant Seeker", desc: "Obtain 1 variant creature", target: 1, reward: { gold: 200, gems: 20 } },
+  { id: "variant_4", category: "collection", name: "Variant Collector", desc: "Obtain all 4 variant types", target: 4, reward: { gold: 800, gems: 80 } },
+  { id: "evolve_1", category: "collection", name: "First Evolution", desc: "Evolve 1 creature", target: 1, reward: { gold: 150, gems: 15 } },
+  { id: "evolve_5", category: "collection", name: "Evolution Master", desc: "Evolve 5 creatures", target: 5, reward: { gold: 750, gems: 75 } },
+  { id: "explore_1", category: "exploration", name: "First Steps", desc: "Complete 1 expedition", target: 1, reward: { gold: 50, gems: 5 } },
+  { id: "explore_10", category: "exploration", name: "Pathfinder", desc: "Complete 10 expeditions", target: 10, reward: { gold: 300, gems: 30 } },
+  { id: "explore_50", category: "exploration", name: "Explorer", desc: "Complete 50 expeditions", target: 50, reward: { gold: 1000, gems: 100 } },
+  { id: "materials_100", category: "exploration", name: "Material Hoarder", desc: "Collect 100 materials", target: 100, reward: { gold: 400, gems: 40 } },
+  { id: "materials_500", category: "exploration", name: "Resource Baron", desc: "Collect 500 materials", target: 500, reward: { gold: 1500, gems: 150 } },
+  { id: "craft_1", category: "crafting", name: "Blacksmith", desc: "Forge 1 item", target: 1, reward: { gold: 100, gems: 10 } },
+  { id: "craft_10", category: "crafting", name: "Artisan", desc: "Forge 10 items", target: 10, reward: { gold: 500, gems: 50 } },
+  { id: "craft_50", category: "crafting", name: "Master Craftsman", desc: "Forge 50 items", target: 50, reward: { gold: 2000, gems: 200 } },
+  { id: "gear_5", category: "crafting", name: "Gear Up", desc: "Equip 5 pieces of gear", target: 5, reward: { gold: 200, gems: 20 } },
+  { id: "gear_20", category: "crafting", name: "Well Equipped", desc: "Equip 20 pieces of gear", target: 20, reward: { gold: 800, gems: 80 } },
+  { id: "dojo_1h", category: "dojo", name: "Beginner Trainee", desc: "Train 1 hour in the dojo", target: 1, reward: { gold: 100, gems: 10 } },
+  { id: "dojo_10h", category: "dojo", name: "Dedicated Student", desc: "Train 10 hours in the dojo", target: 10, reward: { gold: 500, gems: 50 } },
+  { id: "dojo_50h", category: "dojo", name: "Dojo Master", desc: "Train 50 hours in the dojo", target: 50, reward: { gold: 2500, gems: 250 } }
+];
+
 const NPC_LEADERBOARD = [
   { name: "Nightshard", vp: 5200, rank: "Master", wins: 342, losses: 98, badge: "👑" },
   { name: "Kestrix", vp: 4800, rank: "Master", wins: 289, losses: 112, badge: "👑" },
@@ -548,6 +588,8 @@ function generateDefaultSave() {
     dailyQuests: { date: "", quests: [] },
     dailyLogin: { date: "", streak: 0, claimed: false },
     guild: null,
+    achievements: [],
+    stats: { bestStreak: 0, expeditionsCompleted: 0, itemsForged: 0, materialsFound: 0, dojoHours: 0, gearEquipped: 0, evolutionsPerformed: 0 },
     bag: { vitalberry: 5, quickfeather: 2, ironscale: 2, puredew: 1, iron_ore: 3, leather: 2, cloth: 2 },
     mons: [],
     matchHistory: []
@@ -580,6 +622,9 @@ let save = (function () {
   if (!s.shopStock) s.shopStock = null;
   if (!s.dailyLogin) s.dailyLogin = { date: "", streak: 0, claimed: false };
   if (!s.guild) s.guild = null;
+  if (!s.achievements) s.achievements = [];
+  if (!s.stats) s.stats = { bestStreak: 0, expeditionsCompleted: 0, itemsForged: 0, materialsFound: 0, dojoHours: 0, gearEquipped: 0, evolutionsPerformed: 0 };
+  if (s._currentStreak === undefined) s._currentStreak = 0;
   return s;
 })();
 function saveGame() { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); }
@@ -1008,6 +1053,7 @@ function performEvolution(uid) {
 
   showEvolutionAnimation(uid, () => {
     mSave.evolved = true;
+    save.stats.evolutionsPerformed = (save.stats.evolutionsPerformed || 0) + 1;
     saveGame();
     const evolved = getMonData(uid);
     const oldView = document.getElementById("mon-details-view");
@@ -2196,7 +2242,15 @@ function endBattle(won) {
   trackQuest("earn_gold", goldReward);
   save.gold += goldReward;
   save.playerXp += xpReward;
-  if (won) save.wins++; else save.losses++;
+  if (won) {
+    save.wins++;
+    if (!save._currentStreak) save._currentStreak = 0;
+    save._currentStreak++;
+    if (save._currentStreak > save.stats.bestStreak) save.stats.bestStreak = save._currentStreak;
+  } else {
+    save.losses++;
+    save._currentStreak = 0;
+  }
 
   save.matchHistory.unshift({
     date: Date.now(), opponent: battle.opponentName,
@@ -2397,3 +2451,157 @@ if (document.getElementById("btn-rematch")) {
     }
   });
 }
+
+/* ============================= ACHIEVEMENTS SYSTEM ============================= */
+function trackAchievement(type, amount) {
+  if (!save.stats) return;
+  if (type === "explore_complete") save.stats.expeditionsCompleted = (save.stats.expeditionsCompleted || 0) + amount;
+  if (type === "materials_found") save.stats.materialsFound = (save.stats.materialsFound || 0) + amount;
+  if (type === "item_forged") save.stats.itemsForged = (save.stats.itemsForged || 0) + amount;
+  if (type === "gear_equipped") save.stats.gearEquipped = (save.stats.gearEquipped || 0) + amount;
+  if (type === "dojo_hours") save.stats.dojoHours = (save.stats.dojoHours || 0) + amount;
+}
+
+function getAchievementProgress(id) {
+  const ach = ACHIEVEMENTS.find(a => a.id === id);
+  if (!ach) return 0;
+  switch (id) {
+    case "battle_wins_1": case "battle_wins_10": case "battle_wins_50":
+    case "battle_wins_100": case "battle_wins_500": return save.wins;
+    case "battle_streak_5": case "battle_streak_10": return save.stats.bestStreak;
+    case "battle_vp_2000": case "battle_vp_5000": case "battle_vp_10000": return save.vp;
+    case "collect_5": case "collect_12": return new Set(save.mons.map(m => m.baseId)).size;
+    case "variant_1": case "variant_4": return new Set(save.mons.filter(m => m.variant).map(m => m.variant)).size;
+    case "evolve_1": case "evolve_5": return save.stats.evolutionsPerformed;
+    case "explore_1": case "explore_10": case "explore_50": return save.stats.expeditionsCompleted;
+    case "materials_100": case "materials_500": return save.stats.materialsFound;
+    case "craft_1": case "craft_10": case "craft_50": return save.stats.itemsForged;
+    case "gear_5": case "gear_20": return save.stats.gearEquipped;
+    case "dojo_1h": case "dojo_10h": case "dojo_50h": return Math.floor(save.stats.dojoHours / 3600000);
+    default: return 0;
+  }
+}
+
+function getCategoryAchievements(category) {
+  return ACHIEVEMENTS.filter(a => a.category === category);
+}
+
+function getCategoryStatus(category) {
+  const achs = getCategoryAchievements(category);
+  let completed = 0, total = achs.length, claimed = 0;
+  achs.forEach(a => {
+    const progress = getAchievementProgress(a.id);
+    const isComplete = progress >= a.target;
+    const isClaimed = save.achievements.includes(a.id);
+    if (isClaimed) claimed++;
+    else if (isComplete) completed++;
+  });
+  return { completed, total, claimed, pct: total > 0 ? Math.round(((completed + claimed) / total) * 100) : 0 };
+}
+
+function getUnclaimedAchievements() {
+  let count = 0;
+  ACHIEVEMENTS.forEach(a => {
+    if (!save.achievements.includes(a.id) && getAchievementProgress(a.id) >= a.target) count++;
+  });
+  return count;
+}
+
+function claimAchievement(id) {
+  const ach = ACHIEVEMENTS.find(a => a.id === id);
+  if (!ach || save.achievements.includes(id)) return;
+  if (getAchievementProgress(id) < ach.target) return;
+  save.achievements.push(id);
+  save.gold += ach.reward.gold;
+  save.gems += ach.reward.gems;
+  saveGame();
+  refreshHome();
+  refreshAchievementsUI();
+  showModal({ icon: "🏆", title: `Achievement Unlocked: ${ach.name}`, message: `Claimed ${ach.reward.gold} 🪙 and ${ach.reward.gems} 💎!` });
+}
+
+function refreshAchievementsUI() {
+  const container = document.getElementById("achievements-content");
+  if (!container) return;
+
+  const unclaimed = getUnclaimedAchievements();
+  let html = "";
+
+  Object.keys(ACHIEVEMENT_CATEGORIES).forEach(catKey => {
+    const cat = ACHIEVEMENT_CATEGORIES[catKey];
+    const status = getCategoryStatus(catKey);
+    const achs = getCategoryAchievements(catKey);
+
+    html += `<div class="ach-category-card" style="border-color:${cat.color};">
+      <div class="ach-cat-header">
+        <div class="ach-cat-name">${cat.icon} ${cat.name}</div>
+        <div class="ach-cat-pct">${status.pct}%</div>
+      </div>
+      <div class="ach-cat-bar-track"><div class="ach-cat-bar-fill" style="width:${status.pct}%;background:${cat.color};"></div></div>
+      <div class="ach-cat-count">${status.completed + status.claimed}/${status.total} · ${status.claimed} claimed</div>
+    </div>`;
+
+    achs.sort((a, b) => {
+      const aDone = save.achievements.includes(a.id) ? 3 : getAchievementProgress(a.id) >= a.target ? 2 : 1;
+      const bDone = save.achievements.includes(b.id) ? 3 : getAchievementProgress(b.id) >= b.target ? 2 : 1;
+      return aDone - bDone;
+    });
+
+    achs.forEach(ach => {
+      const progress = getAchievementProgress(ach.id);
+      const isComplete = progress >= ach.target;
+      const isClaimed = save.achievements.includes(ach.id);
+      const isTargetNumeric = ach.target > 100;
+      const pct = Math.min(100, Math.round((progress / ach.target) * 100));
+
+      html += `<div class="ach-card ${isClaimed ? 'ach-claimed' : isComplete ? 'ach-ready' : ''}">
+        <div class="ach-info">
+          <div class="ach-name">${ach.name}</div>
+          <div class="ach-desc">${ach.desc}</div>
+          <div class="ach-progress-row">
+            <div class="ach-bar-track"><div class="ach-bar-fill ${isClaimed ? 'ach-bar-claim' : ''}" style="width:${pct}%;${isClaimed ? '' : `background:${cat.color};`}"></div></div>
+            <div class="ach-progress-text">${isTargetNumeric ? formatNum(progress) + '/' + formatNum(ach.target) : progress + '/' + ach.target}</div>
+          </div>
+          <div class="ach-reward">🪙 ${formatNum(ach.reward.gold)} · 💎 ${formatNum(ach.reward.gems)}</div>
+        </div>
+        <div class="ach-action">
+          ${isClaimed ? '<div class="ach-check">✓</div>' : isComplete ? `<button class="btn-ach-claim" data-ach-id="${ach.id}">Claim</button>` : ''}
+        </div>
+      </div>`;
+    });
+  });
+
+  container.innerHTML = html;
+
+  container.querySelectorAll(".btn-ach-claim").forEach(btn => {
+    btn.addEventListener("click", () => claimAchievement(btn.dataset.achId));
+  });
+}
+
+function updateAchievementsDash() {
+  const el = document.querySelector("#card-achievements .desc");
+  if (el) {
+    const count = getUnclaimedAchievements();
+    el.textContent = count > 0 ? `${count} unclaimed!` : "Milestones";
+  }
+}
+
+function initAchievementsUI() {
+  refreshAchievementsUI();
+  show("screen-achievements");
+}
+
+// Card hook
+if (document.getElementById("card-achievements")) {
+  document.getElementById("card-achievements").addEventListener("click", () => {
+    refreshAchievementsUI();
+    show("screen-achievements");
+  });
+}
+
+// Call updateAchievementsDash in refreshHome
+const _origRefreshHome = refreshHome;
+refreshHome = function() {
+  _origRefreshHome();
+  if (typeof updateAchievementsDash === "function") updateAchievementsDash();
+};
