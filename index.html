@@ -128,6 +128,24 @@
   <!-- ROSTER -->
   <section class="screen" id="screen-roster">
     <div class="backrow"><button class="iconbtn" data-back="screen-home">←</button><h2>Roster & Upgrades</h2></div>
+    <div class="roster-header">
+      <select class="btn ghost" id="roster-sort">
+        <option value="name">Sort: Name A-Z</option>
+        <option value="name-desc">Sort: Name Z-A</option>
+        <option value="level">Sort: Level ▼</option>
+        <option value="level-asc">Sort: Level ▲</option>
+        <option value="type">Sort: Element</option>
+      </select>
+      <select class="btn ghost" id="roster-filter">
+        <option value="all">Filter: All</option>
+        <option value="ember">Filter: Ember</option>
+        <option value="aqua">Filter: Aqua</option>
+        <option value="verdant">Filter: Verdant</option>
+        <option value="volt">Filter: Volt</option>
+        <option value="stone">Filter: Stone</option>
+        <option value="gale">Filter: Gale</option>
+      </select>
+    </div>
     <div class="roster-grid" id="roster-view-grid" style="grid-template-columns:1fr;"></div>
   </section>
 
