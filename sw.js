@@ -5,7 +5,19 @@ const ASSETS = [
   '/styles.css',
   '/app.js',
   '/systems.js',
-  '/manifest.json'
+  '/manifest.json',
+  '/assets/creatures/boulderon.PNG',
+  '/assets/creatures/cindrake.PNG',
+  '/assets/creatures/coralisk.PNG',
+  '/assets/creatures/gustling.PNG',
+  '/assets/creatures/pebblin.PNG',
+  '/assets/creatures/pyrelope.PNG',
+  '/assets/creatures/sparkit.PNG',
+  '/assets/creatures/thornuke.PNG',
+  '/assets/creatures/tidenne.PNG',
+  '/assets/creatures/verdil.PNG',
+  '/assets/creatures/voltigo.PNG',
+  '/assets/creatures/zephyrn.PNG'
 ];
 
 self.addEventListener('install', event => {
