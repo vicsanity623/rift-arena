@@ -698,3 +698,45 @@ select.btn.ghost option { background: var(--bg); color: white; }
   color: var(--safe);
   font-weight: bold;
 }
+
+/* --- Enhanced XP Progress Displays --- */
+.xp-text {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--xp-blue);
+  text-align: right;
+  margin-top: 2px;
+  letter-spacing: 0.3px;
+}
+.xp-detail-card {
+  background: var(--card-hi);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+.xp-detail-header {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 18px;
+  color: var(--xp-blue);
+  text-align: center;
+  letter-spacing: 0.5px;
+}
+.xp-detail-stats {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.xp-preview {
+  font-size: 11px;
+  color: var(--gold-dim);
+  text-align: center;
+  font-family: var(--mono);
+  letter-spacing: 0.3px;
+}

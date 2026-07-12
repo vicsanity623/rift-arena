@@ -965,6 +965,7 @@ function renderRosterGrid() {
         </div>
       </div>
       <div class="xp-bar" style="width:100%; margin-top:4px;"><div class="xp-fill" style="width:${(m.xp / m.maxXp) * 100}%"></div></div>
+      <div class="xp-text">${formatNum(m.xp)} / ${formatNum(m.maxXp)} XP (${Math.round((m.xp / m.maxXp) * 100)}%)</div>
       ${passive && m.passiveDesc ? `<div class="passive-desc" style="font-size:10px;color:var(--text-dim);margin-top:2px;">${passive.icon} ${m.passiveDesc}</div>` : ''}
     `;
     card.addEventListener("click", () => showMonDetails(m));
@@ -1004,6 +1005,14 @@ function showMonDetails(m) {
       ${drawStat("ATK", m.atk, 250)}
       ${drawStat("DEF", m.def, 250)}
       ${drawStat("SPD", m.spd, 250)}
+    </div>
+
+    <div class="xp-detail-card">
+      <div class="xp-detail-header">${formatNum(m.xp)} / ${formatNum(m.maxXp)} XP</div>
+      <div class="xp-bar" style="width:100%;"><div class="xp-fill" style="width:${(m.xp / m.maxXp) * 100}%"></div></div>
+      <div class="xp-detail-stats"><span>${Math.round((m.xp / m.maxXp) * 100)}% to next level</span><span>${formatNum(m.maxXp - m.xp)} XP remaining</span></div>
+      ${!m.evolved && m.evolvesAt > 0 ? `<div class="xp-preview" style="color:${m.level >= m.evolvesAt ? 'var(--safe)' : 'var(--gold-dim)'};">${m.level >= m.evolvesAt ? '✦ Evolution ready! ✦' : `Evolves at Lv.${m.evolvesAt} (${m.evolvesAt - m.level} levels away)`}</div>` : ''}
+      ${m.level < 100 ? `<div class="xp-preview">Next level at ${formatNum(getMonMaxXp(m.level))} total XP · Costs ${formatNum(m.level * 100)} 🪙 to level up</div>` : '<div class="xp-preview" style="color:var(--gold);">★ MAX LEVEL REACHED ★</div>'}
     </div>
     
     <div style="font-size:12px; color:var(--text-dim); text-align:center; margin-top:10px;">
