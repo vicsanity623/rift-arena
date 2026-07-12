@@ -1478,6 +1478,31 @@ function startTourneyMatch(matchIdx) {
   show("screen-prep");
 }
 
+function spawnParticleBurst(element, type, isCrit) {
+  const arena = document.getElementById("arena");
+  if (!arena || !element) return;
+  const burst = document.createElement("div");
+  burst.className = "particle-burst " + type + (isCrit ? " crit" : "");
+  const rect = element.getBoundingClientRect();
+  const arenaRect = arena.getBoundingClientRect();
+  burst.style.left = (rect.left - arenaRect.left + rect.width / 2 - 50) + "px";
+  burst.style.top = (rect.top - arenaRect.top + rect.height / 2 - 50) + "px";
+  const count = isCrit ? 12 : 8;
+  for (let i = 0; i < count; i++) {
+    const part = document.createElement("div");
+    part.className = "part";
+    const angle = (360 / count) * i + Math.random() * 30;
+    const dist = 30 + Math.random() * 50;
+    const rad = angle * Math.PI / 180;
+    part.style.setProperty("--px", Math.cos(rad) * dist + "px");
+    part.style.setProperty("--py", Math.sin(rad) * dist + "px");
+    part.style.animationDelay = (Math.random() * 0.1) + "s";
+    burst.appendChild(part);
+  }
+  arena.appendChild(burst);
+  setTimeout(function() { if (burst.parentNode) burst.remove(); }, 800);
+}
+
 /* ============================= BATTLE SYSTEM (ASYNC RESOLUTION) ============================= */
 let battle = null;
 let awaitingInput = true;
@@ -1489,7 +1514,7 @@ function instantiateFoe(baseId, lvl) {
   const scale = 1 + (lvl - 1) * 0.05;
   const itemKey = def[7];
   const m = {
-    uid: "foe_" + Math.random(), name: def[1], type: def[2], level: lvl, item: itemKey,
+    uid: "foe_" + Math.random(), baseId: def[0], name: def[1], type: def[2], level: lvl, item: itemKey,
     baseHp: Math.floor(def[3] * scale), atk: Math.floor(def[4] * scale),
     def: Math.floor(def[5] * scale), spd: Math.floor(def[6] * scale),
     moves: [BASH, MOVES[def[2]], move(def[8], def[2], 80, 85)], shape: def[9]
@@ -1562,8 +1587,14 @@ function renderBattle(fullRebuild) {
   if (pStatusEl) pStatusEl.innerHTML = (p.statusEffects || []).map(k => `<span style="color:${STATUS_EFFECTS[k].color}">${STATUS_EFFECTS[k].icon}</span>`).join(" ") + (p.passive ? `<span title="${p.passive}" style="opacity:0.6;font-size:11px;margin-left:4px;">${p.passiveIcon}</span>` : "");
   if (fStatusEl) fStatusEl.innerHTML = (f.statusEffects || []).map(k => `<span style="color:${STATUS_EFFECTS[k].color}">${STATUS_EFFECTS[k].icon}</span>`).join(" ") + (f.passive ? `<span title="${f.passive}" style="opacity:0.6;font-size:11px;margin-left:4px;">${f.passiveIcon}</span>` : "");
 
-  const pm = document.getElementById("player-mon"); pm.className = "mon " + p.shape + " t-" + p.type + (p.evolved ? " evolved" : "");
-  const fm = document.getElementById("foe-mon"); fm.className = "mon " + f.shape + " t-" + f.type + (f.evolved ? " evolved" : "");
+  const pm = document.getElementById("player-mon"); pm.className = "mon sprite-loaded " + p.shape + " t-" + p.type + (p.evolved ? " evolved" : "");
+  const fm = document.getElementById("foe-mon"); fm.className = "mon sprite-loaded " + f.shape + " t-" + f.type + (f.evolved ? " evolved" : "");
+  const pBaseId = p.baseId || (save.mons.find(m => m.uid === p.uid) ? save.mons.find(m => m.uid === p.uid).baseId : null);
+  const fBaseId = f.baseId;
+  if (pBaseId) pm.style.backgroundImage = "url('assets/creatures/" + pBaseId + ".PNG')";
+  if (fBaseId) fm.style.backgroundImage = "url('assets/creatures/" + fBaseId + ".PNG')";
+  pm.classList.toggle("low-hp", !p.fainted && p.hp / p.baseHp < 0.25);
+  fm.classList.toggle("low-hp", !f.fainted && f.hp / f.baseHp < 0.25);
   (p.statusEffects || []).forEach(k => pm.classList.add(k === "freeze" ? "frozen" : k));
   (f.statusEffects || []).forEach(k => fm.classList.add(k === "freeze" ? "frozen" : k));
 
@@ -1918,7 +1949,11 @@ async function resolveTurn(pAct, aiAct) {
     }
 
     const defEl = document.getElementById(side === "p" ? "foe-mon" : "player-mon");
-    defEl.classList.remove("hit"); void defEl.offsetWidth; defEl.classList.add(isCrit ? "crit-hit" : "hit");
+    defEl.classList.remove("hit", "recoil", "knockback-l", "knockback-r"); void defEl.offsetWidth;
+    defEl.classList.add(isCrit ? "crit-hit" : "hit");
+    const knockDir = side === "p" ? "knockback-r" : "knockback-l";
+    defEl.classList.add("recoil", knockDir);
+    spawnParticleBurst(defEl, mv.type === "neutral" ? atk.type : mv.type, isCrit);
 
     const arena = document.getElementById("arena");
     if (arena) {
