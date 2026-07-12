@@ -54,6 +54,9 @@ button{ font-family:inherit; outline:none; }
 select.btn.ghost { background: var(--card-hi); border-radius: 8px; font-family: var(--body); }
 select.btn.ghost option { background: var(--bg); color: white; }
 
+.roster-header{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:12px; }
+.roster-header select{ flex:1; }
+
 .currencies { display: flex; gap: 6px; }
 .currency { background: rgba(0,0,0,0.45); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px 4px 6px; display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 13px; font-weight: bold; }
 .currency .icon { font-size: 14px; }
@@ -86,7 +89,7 @@ select.btn.ghost option { background: var(--bg); color: white; }
 .dash-card .desc { font-size: 10px; color: var(--text-dim); font-family: var(--mono); text-transform: uppercase; letter-spacing: 1px; }
 
 /* Orbs & Types */
-.orb{ width:46px; height:46px; border-radius:50%; flex:0 0 auto; position:relative; display:flex; align-items:center; justify-content:center; }
+.orb{ width:46px; height:46px; border-radius:50%; flex:0 0 auto; position:relative; display:flex; align-items:center; justify-content:center; background-size:cover; background-position:center; }
 .orb::before{ content:""; position:absolute; inset:0; border-radius:50%; box-shadow: inset 0 0 10px rgba(0,0,0,.35); }
 .orb.sm{ width:30px; height:30px; }
 .orb.t-ember::before{ background:conic-gradient(from 140deg, #ff6a45, #7a331f, #ff6a45); box-shadow: inset 0 0 10px rgba(0,0,0,.35), 0 0 12px rgba(255,106,69,.55); }
@@ -95,6 +98,8 @@ select.btn.ghost option { background: var(--bg); color: white; }
 .orb.t-volt::before{ background:conic-gradient(from 140deg, #f4d33c, #7a691e, #f4d33c); box-shadow: inset 0 0 10px rgba(0,0,0,.35), 0 0 12px rgba(244,211,60,.55); }
 .orb.t-stone::before{ background:conic-gradient(from 140deg, #c98a52, #604227, #c98a52); box-shadow: inset 0 0 10px rgba(0,0,0,.35), 0 0 12px rgba(201,138,82,.55); }
 .orb.t-gale::before{ background:conic-gradient(from 140deg, #9db4ff, #4b5780, #9db4ff); box-shadow: inset 0 0 10px rgba(0,0,0,.35), 0 0 12px rgba(157,180,255,.55); }
+.orb.sprite-orb{ background-size:contain; background-repeat:no-repeat; }
+.orb.sprite-orb::before{ opacity:0.5; mix-blend-mode:multiply; }
 
 /* Roster Cards */
 .roster-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; overflow-y:auto; padding-bottom:8px; }
@@ -104,6 +109,7 @@ select.btn.ghost option { background: var(--bg); color: white; }
 .cmon-card.locked { opacity: 0.4; filter: grayscale(100%); cursor: not-allowed; }
 .cmon-card.picked{ border-color:var(--gold); box-shadow:0 0 0 1px var(--gold) inset, 0 0 14px rgba(230,185,77,.25); }
 .cmon-card .row1{ display:flex; align-items:center; gap:10px; }
+.cmon-card .row1 .sprite-thumb{ width:46px; height:46px; border-radius:50%; flex:0 0 auto; background-size:contain; background-position:center; background-repeat:no-repeat; position:relative; }
 .cmon-card .name{ font-family:var(--display); font-weight:700; font-size:15px; display:flex; align-items:center; gap:6px; }
 .cmon-card .type{ font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.6px; }
 .cmon-card .stats{ display:flex; gap:8px; font-family:var(--mono); font-size:11px; color:var(--text-dim); flex-wrap:wrap; }
@@ -185,20 +191,20 @@ select.btn.ghost option { background: var(--bg); color: white; }
 
 /* Sprites in battle */
 .field{ position:relative; flex:1; display:flex; align-items:center; justify-content:space-around; padding:8px 20px 18px; }
-.mon{ width:92px; height:92px; border-radius:50%; position:relative; transition:transform .25s ease, filter .25s ease; background-size:cover; background-position:center; background-repeat:no-repeat; box-shadow:0 8px 22px rgba(0,0,0,.5), inset 0 0 16px rgba(0,0,0,.3); }
+.mon{ width:130px; height:130px; border-radius:50%; position:relative; transition:transform .25s ease, filter .25s ease; background-size:contain; background-position:center; background-repeat:no-repeat; box-shadow:0 8px 22px rgba(0,0,0,.5); }
 .mon::before{ content:""; position:absolute; inset:0; border-radius:50%; z-index:-1; }
-.mon.t-ember::before{ background:radial-gradient(circle at 35% 30%, #ffb49f, #ff6a45 60%, #7a331f); }
-.mon.t-aqua::before{ background:radial-gradient(circle at 35% 30%, #a6e8f5, #33c7ea 60%, #185f70); }
-.mon.t-verdant::before{ background:radial-gradient(circle at 35% 30%, #bdf0c3, #5fd66b 60%, #2d6633); }
-.mon.t-volt::before{ background:radial-gradient(circle at 35% 30%, #faeca0, #f4d33c 60%, #7a691e); }
-.mon.t-stone::before{ background:radial-gradient(circle at 35% 30%, #e6c9a8, #c98a52 60%, #604227); }
-.mon.t-gale::before{ background:radial-gradient(circle at 35% 30%, #d3ddff, #9db4ff 60%, #4b5780); }
+.mon.t-ember::before{ background:radial-gradient(circle at 35% 30%, rgba(255,106,69,0.25), transparent 70%); }
+.mon.t-aqua::before{ background:radial-gradient(circle at 35% 30%, rgba(51,199,234,0.25), transparent 70%); }
+.mon.t-verdant::before{ background:radial-gradient(circle at 35% 30%, rgba(95,214,107,0.25), transparent 70%); }
+.mon.t-volt::before{ background:radial-gradient(circle at 35% 30%, rgba(244,211,60,0.25), transparent 70%); }
+.mon.t-stone::before{ background:radial-gradient(circle at 35% 30%, rgba(201,138,82,0.25), transparent 70%); }
+.mon.t-gale::before{ background:radial-gradient(circle at 35% 30%, rgba(157,180,255,0.25), transparent 70%); }
 .mon.spiky::after, .mon.smooth::after, .mon.angular::after{ content:""; position:absolute; inset:0; border-radius:50%; }
 .mon.spiky::after{ background: conic-gradient(from 0deg, transparent 0 10deg, rgba(255,255,255,.18) 12deg 16deg, transparent 18deg 40deg) ; }
 .mon.angular::after{ clip-path:polygon(50% 6%, 94% 50%, 50% 94%, 6% 50%); background:rgba(255,255,255,.08); }
 .mon .face{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; }
-.mon .eye{ position:absolute; width:8px; height:10px; background:#12101c; border-radius:50%; top:34px; }
-.mon .eye.l{ left:26px; } .mon .eye.r{ right:26px; }
+.mon .eye{ position:absolute; width:8px; height:10px; background:#12101c; border-radius:50%; top:52px; }
+.mon .eye.l{ left:42px; } .mon .eye.r{ right:42px; }
 .mon.hit{ animation:hitflash .35s ease; }
 @keyframes hitflash{ 0%{ filter:brightness(1);} 30%{ filter:brightness(2.3) saturate(0);} 100%{ filter:brightness(1);} }
 .mon.crit-hit{ animation:critflash .45s ease; }

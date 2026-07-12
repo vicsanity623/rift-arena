@@ -876,13 +876,36 @@ refreshHome();
 /* ============================= ROSTER & DETAILS ============================= */
 function statLine(m) { return `HP ${m.baseHp} · ATK ${m.atk} · DEF ${m.def} · SPD ${m.spd}`; }
 
-function buildRosterView() {
+let rosterFilterType = "all";
+let rosterSortKey = "name";
+
+function getRosterMons() {
+  let list = save.mons.map(mSave => ({ mSave, m: getMonData(mSave.uid) }));
+  if (rosterFilterType !== "all") {
+    list = list.filter(x => x.m.type === rosterFilterType);
+  }
+  list.sort((a, b) => {
+    switch (rosterSortKey) {
+      case "name": return a.m.name.localeCompare(b.m.name);
+      case "name-desc": return b.m.name.localeCompare(a.m.name);
+      case "level": return b.m.level - a.m.level;
+      case "level-asc": return a.m.level - b.m.level;
+      case "type": {
+        const tOrder = ["ember", "aqua", "verdant", "volt", "stone", "gale"];
+        return tOrder.indexOf(a.m.type) - tOrder.indexOf(b.m.type);
+      }
+      default: return 0;
+    }
+  });
+  return list;
+}
+
+function renderRosterGrid() {
   const grid = document.getElementById("roster-view-grid");
   if (!grid) return;
   grid.innerHTML = "";
 
-  save.mons.forEach(mSave => {
-    const m = getMonData(mSave.uid);
+  getRosterMons().forEach(({ mSave, m }) => {
     const card = document.createElement("div");
     card.className = "cmon-card " + (m.onExpedition ? "locked" : "");
     const vBadge = m.variant ? `<span class="var-badge var-${m.variant}">${m.variantDef.icon}</span>` : "";
@@ -890,7 +913,7 @@ function buildRosterView() {
     const evoTag = m.evolved ? `<span class="evo-badge">✦</span>` : "";
     card.innerHTML = `
       <div class="row1">
-        <div class="orb t-${m.type} ${m.evolved ? 'evo-orb-glow' : ''}"><div class="glyph"></div></div>
+        <div class="sprite-thumb" style="background-image:url('assets/creatures/${m.baseId}.PNG')"></div>
         <div style="flex:1;">
           <div class="name">${vBadge}${evoTag}${m.name} <span class="badge">Lv.${m.level}</span></div>
           <div class="type">${m.type}${passive ? ` · ${passive.icon} ${passive.name}` : ''} ${m.onExpedition ? '(Exploring)' : ''} ${m.variant ? m.variantDef.name : ''}</div>
@@ -902,6 +925,14 @@ function buildRosterView() {
     card.addEventListener("click", () => showMonDetails(m));
     grid.appendChild(card);
   });
+}
+
+function buildRosterView() {
+  const sortEl = document.getElementById("roster-sort");
+  const filterEl = document.getElementById("roster-filter");
+  if (sortEl) sortEl.onchange = () => { rosterSortKey = sortEl.value; renderRosterGrid(); };
+  if (filterEl) filterEl.onchange = () => { rosterFilterType = filterEl.value; renderRosterGrid(); };
+  renderRosterGrid();
 }
 
 function showMonDetails(m) {
@@ -919,7 +950,7 @@ function showMonDetails(m) {
   const vTag = m.variant ? `<div class="var-badge var-${m.variant}" style="display:inline-block; font-size:13px; padding:2px 10px;">${m.variantDef.icon} ${m.variantDef.name}</div>` : "";
   const evoTag = m.evolved ? `<span class="evo-badge-lg">✦ EVOLVED</span>` : "";
   view.innerHTML = `
-    <div class="orb mon-big-orb t-${m.type} ${m.evolved ? 'evo-orb-glow' : ''}"><div class="glyph"></div></div>
+    <div class="orb mon-big-orb sprite-orb t-${m.type} ${m.evolved ? 'evo-orb-glow' : ''}" style="background-image:url('assets/creatures/${m.baseId}.PNG'); transform:scale(1.8); margin:30px 0;"></div>
     <div style="text-align:center; font-family:var(--display); font-weight:800; font-size:22px;">${vTag} ${m.name} <span class="badge">Lv.${m.level}</span> ${evoTag}</div>
     ${m.evolved ? `<div style="text-align:center; font-size:11px; color:var(--gold);">✦ Evolution Bonus: +25% All Stats</div>` : (m.evolvesAt > 0 ? `<div style="text-align:center; font-size:11px; color:var(--text-dim);">Evolves at Lv.${m.evolvesAt} → ${m.evoName} (+25% all stats)</div>` : '')}
     
@@ -1102,7 +1133,7 @@ function buildSelectGrid() {
     const passive = getPassive(m.type);
     card.innerHTML = `
       <div class="pickbadge" style="display:none;"></div>
-      <div class="row1"><div class="orb t-${m.type}"><div class="glyph"></div></div>
+      <div class="row1"><div class="sprite-thumb" style="background-image:url('assets/creatures/${m.baseId}.PNG')"></div>
       <div><div class="name">${m.name} <span class="badge">Lv.${m.level}</span></div><div class="type">${m.type}${passive ? ` ${passive.icon}` : ''}</div></div></div>
       <div class="stats">${statLine(m)}</div>
       ${m.passiveDesc ? `<div class="passive-desc" style="font-size:10px;color:var(--text-dim);margin-top:2px;">${m.passiveIcon} ${m.passiveDesc}</div>` : ''}

@@ -307,7 +307,7 @@ function initDojoUI() {
       container.innerHTML = `
         <div class="details-card" style="text-align:center;">
           <h3>Training in Progress</h3>
-          <div class="orb mon-big-orb t-${m.type}" style="margin:20px auto;"><div class="glyph"></div></div>
+          <div class="orb mon-big-orb sprite-orb t-${m.type}" style="margin:20px auto;background-image:url('assets/creatures/${m.baseId}.PNG');transform:scale(2);"><div class="glyph"></div></div>
           <p>${m.name} is training (${training.name})...</p>
           <p style="font-family:var(--mono); color:var(--warn); font-size:24px;">${mins}:${String(secs).padStart(2,"0")} remaining</p>
         </div>
@@ -645,7 +645,7 @@ function initExploreUI() {
       container.innerHTML = `
         <div class="details-card" style="text-align:center;">
           <h3>Expedition in Progress</h3>
-          <div class="orb mon-big-orb t-${m.type}" style="margin: 20px auto;"><div class="glyph"></div></div>
+          <div class="orb mon-big-orb sprite-orb t-${m.type}" style="margin:20px auto;background-image:url('assets/creatures/${m.baseId}.PNG');transform:scale(2);"><div class="glyph"></div></div>
           <p>${m.name} is exploring...</p>
           <p style="font-family:var(--mono); color:var(--warn); font-size:24px;">${mins}m remaining</p>
         </div>
