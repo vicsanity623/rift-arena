@@ -307,11 +307,12 @@ function initDojoUI() {
       container.innerHTML = `
         <div class="details-card" style="text-align:center;">
           <h3>Training in Progress</h3>
-          <div class="orb mon-big-orb sprite-orb t-${m.type}" style="margin:20px auto;background-image:url('assets/creatures/${m.baseId}.PNG');transform:scale(2);"><div class="glyph"></div></div>
+          <div class="orb mon-big-orb sprite-orb t-${m.type}" id="dojo-sprite" style="margin:20px auto;transform:scale(2);"><div class="glyph"></div></div>
           <p>${m.name} is training (${training.name})...</p>
           <p style="font-family:var(--mono); color:var(--warn); font-size:24px;">${mins}:${String(secs).padStart(2,"0")} remaining</p>
         </div>
       `;
+      setTimeout(function() { var el = document.getElementById("dojo-sprite"); if (el) setCreatureSprite(el, m.baseId, m.evolved); }, 50);
     }
   } else {
     const eligibleMons = save.mons.filter(m => !m.onExpedition);
@@ -646,11 +647,12 @@ function initExploreUI() {
       container.innerHTML = `
         <div class="details-card" style="text-align:center;">
           <h3>Expedition in Progress</h3>
-          <div class="orb mon-big-orb sprite-orb t-${m.type}" style="margin:20px auto;background-image:url('assets/creatures/${m.baseId}.PNG');transform:scale(2);"><div class="glyph"></div></div>
+          <div class="orb mon-big-orb sprite-orb t-${m.type}" id="explore-sprite" style="margin:20px auto;transform:scale(2);"><div class="glyph"></div></div>
           <p>${m.name} is exploring...</p>
           <p style="font-family:var(--mono); color:var(--warn); font-size:24px;">${mins}m remaining</p>
         </div>
       `;
+      setTimeout(function() { var el = document.getElementById("explore-sprite"); if (el) setCreatureSprite(el, m.baseId, m.evolved); }, 50);
     }
   } else {
     // Setup new expedition
@@ -1056,6 +1058,20 @@ function purchaseShopItem(idx) {
   refreshHome();
 }
 
+// --- SPRITE LOADING HELPER (Evolved with Fallback) ---
+function setCreatureSprite(el, baseId, evolved) {
+  const standardUrl = "url('assets/creatures/" + baseId + ".PNG')";
+  el.style.backgroundImage = standardUrl;
+  if (evolved) {
+    const evolvedPath = "assets/creatures/" + baseId + "_evolved.PNG";
+    const evolvedUrl = "url('" + evolvedPath + "')";
+    const img = new Image();
+    img.onload = function() { el.style.backgroundImage = evolvedUrl; };
+    img.onerror = function() { };
+    img.src = evolvedPath;
+  }
+}
+
 // --- LAB / BREEDING SYSTEM ---
 function initLabUI() {
   const container = document.getElementById("lab-content");
@@ -1087,7 +1103,7 @@ function initLabUI() {
     <div style="display:flex; flex-direction:column; gap:12px;">
       <div class="details-card" style="align-items:center; text-align:center;">
         <h3>Select Breeders</h3>
-        <p class="subtitle">Breeding consumes the raw power of two high-level Rift-forms to synthesize a brand new Variant at Lv.1.</p>
+        <p class="subtitle">Breed two high-level Rift-forms to create a new Variant offspring at Lv.1 with blended inherited stats and a random 10-20% mutation bonus. Parents are kept in your roster.</p>
       </div>
       <div style="display:flex; flex-direction:column; gap:8px;">
         <label style="font-size:12px; color:var(--text-dim);">Parent A (Lv.10+):</label>
@@ -1138,8 +1154,8 @@ function initLabUI() {
 
     preview.innerHTML = `
       <div style="font-weight:bold; font-size:15px; color:var(--safe);"><span class="var-badge var-${mockVariant}" style="display:inline-block;">${vDef.icon}</span> ${vDef.name} ${chosenDef[1]}</div>
-      <div style="font-size:12px; color:var(--text-dim); margin-top:2px;">Type: ${chosenDef[2]} · Stat Boosts on synthesis</div>
-      <div style="font-size:11px; color:var(--gold-dim); margin-top:4px;">Gene Mix: ${def1[1]} × ${def2[1]}</div>
+      <div style="font-size:12px; color:var(--text-dim); margin-top:2px;">Type: ${chosenDef[2]} · Blended inherited stats + 10-20% mutation</div>
+      <div style="font-size:11px; color:var(--gold-dim); margin-top:4px;">Gene Mix: ${def1[1]} × ${def2[1]} · Parents kept in roster</div>
     `;
   }
 
@@ -1161,23 +1177,49 @@ function initLabUI() {
     const def1 = ROSTER_DEF.find(r => r[0] === m1.baseId);
     const def2 = ROSTER_DEF.find(r => r[0] === m2.baseId);
 
-    // Breeders are consumed
-    save.mons = save.mons.filter(m => m.uid !== uid1 && m.uid !== uid2);
-
+    // Parents are kept in the roster (not sacrificed)
     const chosenDef = Math.random() < 0.5 ? def1 : def2;
     const vKeys = Object.keys(VARIANTS);
     const childVariant = vKeys[Math.floor(Math.random() * vKeys.length)];
     const vDef = VARIANTS[childVariant];
 
+    // Get full stats of both parents for blended inheritance
+    const p1Data = getMonData(uid1);
+    const p2Data = getMonData(uid2);
+
+    // Blended average of parent stats
+    const avgHp = (p1Data.baseHp + p2Data.baseHp) / 2;
+    const avgAtk = (p1Data.atk + p2Data.atk) / 2;
+    const avgDef = (p1Data.def + p2Data.def) / 2;
+    const avgSpd = (p1Data.spd + p2Data.spd) / 2;
+
+    // Compute base Lv.1 stats for the chosen offspring creature
+    const baseScale = 1;
+    const offBaseHp = Math.floor(chosenDef[3] * baseScale);
+    const offBaseAtk = Math.floor(chosenDef[4] * baseScale);
+    const offBaseDef = Math.floor(chosenDef[5] * baseScale);
+    const offBaseSpd = Math.floor(chosenDef[6] * baseScale);
+
+    // Random mutation bonus: 10-20% boost applied to all stats
+    const mutationMult = 1 + (0.10 + Math.random() * 0.10);
+
+    // Calculate mergeBonuses to achieve blended + mutated stats
+    const offHpBonus = Math.max(0, (avgHp * mutationMult) / offBaseHp - 1);
+    const offAtkBonus = Math.max(0, (avgAtk * mutationMult) / offBaseAtk - 1);
+    const offDefBonus = Math.max(0, (avgDef * mutationMult) / offBaseDef - 1);
+    const offSpdBonus = Math.max(0, (avgSpd * mutationMult) / offBaseSpd - 1);
+
     const uid = "breed_" + Date.now().toString() + Math.floor(Math.random() * 100);
     save.mons.push({
       uid, baseId: chosenDef[0], level: 1, xp: 0,
-      heldItem: "none", mergeBonuses: {}, onExpedition: false,
+      heldItem: "none",
+      mergeBonuses: { hp: offHpBonus, atk: offAtkBonus, def: offDefBonus, spd: offSpdBonus },
+      onExpedition: false,
       evolved: false, variant: childVariant, mp: 0, talents: []
     });
 
     saveGame();
-    showModal({ icon: "🧬", title: "Gene Synthesis Complete!", message: `Both parents fused into a rare Variant:<br>${vDef.icon} ${vDef.name} ${chosenDef[1]} (Lv.1)!` });
+    showModal({ icon: "🧬", title: "Gene Synthesis Complete!", message: `Offspring created with inherited stats!<br>${vDef.icon} ${vDef.name} ${chosenDef[1]} (Lv.1)<br><br>Parents remain in your roster.` });
     refreshHome();
     initLabUI();
   };
