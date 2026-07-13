@@ -409,6 +409,12 @@ function claimDojo() {
 let survivalState = null;
 
 function startSurvivalMode() {
+  awaitingInput = true;
+  setWeather("none", 0);
+  const el = document.getElementById("action-panel");
+  if (el) el.innerHTML = "";
+  const logEl = document.getElementById("battle-log");
+  if (logEl) logEl.textContent = "Preparing for Survival Mode...";
   const pData = pickOrder.map(uid => getMonData(uid));
   if (pData.length !== 3) return showModal({ icon: "⚠️", title: "Team Selection", message: "Select 3 Rift-forms first." });
 
@@ -456,6 +462,14 @@ function generateSurvivalWave() {
   } else {
     oppIds = ROSTER_DEF.map(r=>r[0]).sort(()=>Math.random()-0.5).slice(0, 3);
   }
+
+  // Reset battle state for next wave
+  awaitingInput = true;
+  setWeather("none", 0);
+  const ap = document.getElementById("action-panel");
+  if (ap) ap.innerHTML = "";
+  const bl = document.getElementById("battle-log");
+  if (bl) bl.textContent = "";
 
   // Refill alive player mons, keep dead ones dead
   survivalState.player.forEach(m => {
@@ -1905,6 +1919,14 @@ function enterDungeonFloor() {
     }
     oppIds = pool.sort(() => Math.random() - 0.5).slice(0, 3);
   }
+
+  // Reset battle state for next floor
+  awaitingInput = true;
+  setWeather("none", 0);
+  const apEl = document.getElementById("action-panel");
+  if (apEl) apEl.innerHTML = "";
+  const blEl = document.getElementById("battle-log");
+  if (blEl) blEl.textContent = "";
 
   const trainerName = isBoss ? dd.bossName : `${dd.name} Guardian`;
 
