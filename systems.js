@@ -744,7 +744,7 @@ function claimExplore() {
     const oppPool = ROSTER_DEF.map(r=>r[0]);
     const rareId = oppPool[Math.floor(Math.random()*oppPool.length)];
     const def = ROSTER_DEF.find(r => r[0] === rareId);
-    save.mons.push({ uid: Date.now().toString(), baseId: rareId, level: 1, xp: 0, heldItem: "none", mergeBonuses: {}, onExpedition: false, evolved: false, variant: null });
+    save.mons.push({ uid: Date.now().toString(), baseId: rareId, level: 1, xp: 0, heldItem: "none", mergeBonuses: {}, onExpedition: false, evolved: false, variant: null, mp: 0, talents: [] });
     rareMsg = `<br><br>✨ <b>RARE FIND!</b> Found a wild ${def[1]}!`;
   }
   
@@ -1173,7 +1173,7 @@ function initLabUI() {
     save.mons.push({
       uid, baseId: chosenDef[0], level: 1, xp: 0,
       heldItem: "none", mergeBonuses: {}, onExpedition: false,
-      evolved: false, variant: childVariant
+      evolved: false, variant: childVariant, mp: 0, talents: []
     });
 
     saveGame();
@@ -1693,7 +1693,7 @@ function handleDungeonFloorEnd(won) {
           uid: "dungeon_" + Date.now().toString(),
           baseId: rareId, level: 1, xp: 0,
           heldItem: "none", mergeBonuses: {}, onExpedition: false,
-          evolved: false, variant: null
+          evolved: false, variant: null, mp: 0, talents: []
         });
         dungeonState._rareFound = def[1];
       }
