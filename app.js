@@ -1216,7 +1216,7 @@ function renderRosterGrid() {
     const evoTag = m.evolved ? `<span class="evo-badge">✦</span>` : "";
     card.innerHTML = `
       <div class="row1">
-        <div class="sprite-thumb" style="background-image:url('assets/creatures/${m.baseId}.PNG')"></div>
+        <div class="sprite-thumb" id="roster-sprite-${m.uid}"></div>
         <div style="flex:1;">
           <div class="name">${vBadge}${evoTag}${m.name} <span class="badge">Lv.${m.level}</span></div>
           <div class="type">${m.type}${passive ? ` · ${passive.icon} ${passive.name}` : ''} ${m.onExpedition ? '(Exploring)' : ''} ${m.variant ? m.variantDef.name : ''}</div>
@@ -1228,6 +1228,7 @@ function renderRosterGrid() {
     `;
     card.addEventListener("click", () => showMonDetails(m));
     grid.appendChild(card);
+    setCreatureSprite(document.getElementById("roster-sprite-" + m.uid), m.baseId, m.evolved);
   });
 }
 
@@ -1254,7 +1255,7 @@ function showMonDetails(m) {
   const vTag = m.variant ? `<div class="var-badge var-${m.variant}" style="display:inline-block; font-size:13px; padding:2px 10px;">${m.variantDef.icon} ${m.variantDef.name}</div>` : "";
   const evoTag = m.evolved ? `<span class="evo-badge-lg">✦ EVOLVED</span>` : "";
   view.innerHTML = `
-    <div class="orb mon-big-orb sprite-orb t-${m.type} ${m.evolved ? 'evo-orb-glow' : ''}" style="background-image:url('assets/creatures/${m.baseId}.PNG'); transform:scale(1.8); margin:30px 0;"></div>
+    <div class="orb mon-big-orb sprite-orb t-${m.type} ${m.evolved ? 'evo-orb-glow' : ''}" id="detail-sprite-${m.uid}" style="transform:scale(1.8); margin:30px 0;"></div>
     <div style="text-align:center; font-family:var(--display); font-weight:800; font-size:22px;">${vTag} ${m.name} <span class="badge">Lv.${m.level}</span> ${evoTag}</div>
     ${m.evolved ? `<div style="text-align:center; font-size:11px; color:var(--gold);">✦ Evolution Bonus: +25% All Stats</div>` : (m.evolvesAt > 0 ? `<div style="text-align:center; font-size:11px; color:var(--text-dim);">Evolves at Lv.${m.evolvesAt} → ${m.evoName} (+25% all stats)</div>` : '')}
     
@@ -1288,6 +1289,7 @@ function showMonDetails(m) {
   `;
 
   show("screen-details");
+  setCreatureSprite(document.getElementById("detail-sprite-" + m.uid), m.baseId, m.evolved);
 
   document.getElementById("btn-lvlup").onclick = () => {
     if (save.gold < upgCost) return showModal({ icon: "🪙", title: "Not Enough Gold", message: "Not enough gold." });
@@ -1453,13 +1455,14 @@ function buildSelectGrid() {
     const passive = getPassive(m.type);
     card.innerHTML = `
       <div class="pickbadge" style="display:none;"></div>
-      <div class="row1"><div class="sprite-thumb" style="background-image:url('assets/creatures/${m.baseId}.PNG')"></div>
+      <div class="row1"><div class="sprite-thumb" id="select-sprite-${m.uid}"></div>
       <div><div class="name">${m.name} <span class="badge">Lv.${m.level}</span></div><div class="type">${m.type}${passive ? ` ${passive.icon}` : ''}</div></div></div>
       <div class="stats">${statLine(m)}</div>
       ${m.passiveDesc ? `<div class="passive-desc" style="font-size:10px;color:var(--text-dim);margin-top:2px;">${m.passiveIcon} ${m.passiveDesc}</div>` : ''}
     `;
     card.onclick = () => togglePick(m.uid, card);
     grid.appendChild(card);
+    setCreatureSprite(document.getElementById("select-sprite-" + m.uid), m.baseId, m.evolved);
   });
   updateConfirmBtn();
 }
@@ -1942,8 +1945,8 @@ function renderBattle(fullRebuild) {
   const fm = document.getElementById("foe-mon"); fm.className = "mon sprite-loaded " + f.shape + " t-" + f.type + (f.evolved ? " evolved" : "");
   const pBaseId = p.baseId || (save.mons.find(m => m.uid === p.uid) ? save.mons.find(m => m.uid === p.uid).baseId : null);
   const fBaseId = f.baseId;
-  if (pBaseId) pm.style.backgroundImage = "url('assets/creatures/" + pBaseId + ".PNG')";
-  if (fBaseId) fm.style.backgroundImage = "url('assets/creatures/" + fBaseId + ".PNG')";
+  if (pBaseId) setCreatureSprite(pm, pBaseId, p.evolved);
+  if (fBaseId) setCreatureSprite(fm, fBaseId, f.evolved);
   pm.classList.toggle("low-hp", !p.fainted && p.hp / p.baseHp < 0.25);
   fm.classList.toggle("low-hp", !f.fainted && f.hp / f.baseHp < 0.25);
   (p.statusEffects || []).forEach(k => pm.classList.add(k === "freeze" ? "frozen" : k));
