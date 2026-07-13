@@ -529,6 +529,10 @@ function handleSurvivalWaveEnd(won) {
       }
     });
 
+    // Guild XP from survival wave clear
+    if (typeof addGuildXp === "function") addGuildXp(15 + survivalState.wave * 5);
+    if (typeof addGuildChat === "function" && save.guild) addGuildChat("⚔️", `Survival Wave ${survivalState.wave - 1} cleared!`);
+
     saveGame();
 
     // Check if any player mons died
@@ -723,12 +727,13 @@ function claimExplore() {
   save.vp += vpGained;
   
   // Crafting materials scaled by duration
+  const lootMult = guildMults.loot || 1;
   const materials = {
-    iron_ore: Math.floor(dur / 30) + 1,
-    leather: Math.floor(dur / 30) + 1,
-    cloth: Math.floor(dur / 30) + 1,
-    crystal_shard: dur >= 120 ? 2 : dur >= 30 ? 1 : 0,
-    essence_nature: dur >= 120 ? 1 : 0
+    iron_ore: Math.floor((dur / 30) * lootMult) + 1,
+    leather: Math.floor((dur / 30) * lootMult) + 1,
+    cloth: Math.floor((dur / 30) * lootMult) + 1,
+    crystal_shard: dur >= 120 ? Math.round(2 * lootMult) : dur >= 30 ? Math.round(1 * lootMult) : 0,
+    essence_nature: dur >= 120 ? Math.round(1 * lootMult) : 0
   };
   let matMsg = "";
   Object.keys(materials).forEach(key => {
@@ -757,6 +762,10 @@ function claimExplore() {
     const totalMats = Object.keys(materials).reduce((s, k) => s + materials[k], 0);
     if (totalMats > 0) trackAchievement("materials_found", totalMats);
   }
+  // Guild XP from exploration
+  const guildExploreXp = dur * 3;
+  if (typeof addGuildXp === "function") addGuildXp(guildExploreXp);
+  if (typeof addGuildChat === "function" && save.guild) addGuildChat("🗺️", `An expedition returned with ${formatNum(goldGained)} 🪙 and ${xpGained} XP`);
   saveGame();
   
   showModal({ icon: "🗺️", title: "Expedition Complete!", message: `${xpGained} Mon XP<br>${formatNum(goldGained)} Gold<br>${formatNum(gemsGained)} Gems<br>${vpGained} VP${matMsg.replace(/\n/g, "<br>")}${rareMsg}` });
@@ -1239,7 +1248,10 @@ const GUILD_PERK_DEFS = {
   explore: { name: "Explorer's Grant", icon: "🗺️", desc: "Bonus explore rewards", basePct: 10, scalePerLvl: 5, unlockLvl: 1, maxPct: 50 },
   training: { name: "Training Accel", icon: "🥋", desc: "Reduced dojo training time", basePct: 20, scalePerLvl: 5, unlockLvl: 3, maxPct: 60 },
   shop: { name: "Merchant's Discount", icon: "🏪", desc: "Reduced shop prices", basePct: 10, scalePerLvl: 3, unlockLvl: 4, maxPct: 35 },
-  goldFind: { name: "Gold Rush", icon: "🪙", desc: "Bonus gold from all sources", basePct: 8, scalePerLvl: 2, unlockLvl: 5, maxPct: 25 }
+  goldFind: { name: "Gold Rush", icon: "🪙", desc: "Bonus gold from all sources", basePct: 8, scalePerLvl: 2, unlockLvl: 5, maxPct: 25 },
+  lootFinder: { name: "Loot Finder", icon: "💎", desc: "Bonus expedition loot", basePct: 15, scalePerLvl: 5, unlockLvl: 3, maxPct: 50 },
+  battleRush: { name: "Battle Rush", icon: "⚡", desc: "Reduced stamina cost between battles", basePct: 10, scalePerLvl: 4, unlockLvl: 2, maxPct: 40 },
+  unity: { name: "Unity", icon: "🤝", desc: "Combo damage bonus when guild members' creatures are in play", basePct: 10, scalePerLvl: 3, unlockLvl: 4, maxPct: 35 }
 };
 
 function getGuildPerkValue(perkKey, guildLevel) {
@@ -1320,7 +1332,11 @@ function showGuildCreate(container) {
       members: 1,
       founded: Date.now(),
       donated: 0,
-      perks: [perk]
+      perks: [perk],
+      memberNames: [],
+      recruits: [],
+      recruitCooldown: 0,
+      chatLog: [{ icon: "🏰", message: "Guild founded!", time: Date.now() }]
     };
     saveGame();
     refreshHome();
@@ -1333,6 +1349,8 @@ function showGuildCreate(container) {
 function showGuildDashboard(container) {
   const g = save.guild;
   if (!g.perks) g.perks = [g.perk];
+  if (!g.memberNames) g.memberNames = [];
+  if (!g.chatLog) g.chatLog = [];
   const guildXpNeeded = g.level * 300;
   const unlocked = getUnlockedPerks(g.level);
   const allKeys = getAllPerkKeys();
@@ -1355,15 +1373,68 @@ function showGuildDashboard(container) {
     </div>`;
   });
 
+  // Generate recruits if needed
+  if (Math.random() < 0.4) generateGuildRecruit();
+
+  // Recruitment HTML
+  let recruitHtml = "";
+  if (g.recruits && g.recruits.length > 0) {
+    recruitHtml = `<div style="margin-top:8px; border-top:1px solid var(--line); padding-top:10px;">
+      <div style="font-weight:bold; font-size:13px; margin-bottom:6px; color:var(--gold);">👋 Join Requests</div>`;
+    g.recruits.forEach((r, i) => {
+      recruitHtml += `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; background:var(--card); border-radius:8px; margin-bottom:4px; border:1px solid var(--line);">
+        <div><span style="font-weight:bold;">${r.name}</span> <span class="badge t-${r.type}" style="background:var(--line);">${r.type}</span> Lv.${r.level}</div>
+        <div style="display:flex; gap:4px;">
+          <button class="btn-recruit-accept" data-idx="${i}" style="padding:4px 10px; border:none; border-radius:6px; background:var(--safe); color:#000; font-weight:bold; cursor:pointer;">Accept</button>
+          <button class="btn-recruit-decline" data-idx="${i}" style="padding:4px 10px; border:none; border-radius:6px; background:var(--danger); color:white; font-weight:bold; cursor:pointer;">✕</button>
+        </div>
+      </div>`;
+    });
+    recruitHtml += `</div>`;
+  }
+
+  // Members list
+  let membersHtml = "";
+  if (g.memberNames && g.memberNames.length > 0) {
+    membersHtml = `<div style="font-size:11px; color:var(--text-dim); margin-top:6px;">Members: ${g.memberNames.slice(0, 5).join(", ")}${g.memberNames.length > 5 ? ` +${g.memberNames.length - 5} more` : ""}</div>`;
+  }
+
+  // Chat log
+  let chatHtml = "";
+  if (g.chatLog.length > 0) {
+    chatHtml = `<div style="margin-top:8px; border-top:1px solid var(--line); padding-top:10px;">
+      <div style="font-weight:bold; font-size:13px; margin-bottom:6px;">📜 Activity Log</div>
+      <div style="max-height:120px; overflow-y:auto; display:flex; flex-direction:column; gap:3px;">`;
+    g.chatLog.slice(0, 10).forEach(entry => {
+      chatHtml += `<div style="font-size:11px; display:flex; gap:4px; align-items:center;">
+        <span>${entry.icon}</span>
+        <span style="color:var(--text-dim); flex:1;">${entry.message}</span>
+        <span style="color:var(--text-dim); font-family:var(--mono); font-size:9px;">${formatGuildTime(entry.time)}</span>
+      </div>`;
+    });
+    chatHtml += `</div></div>`;
+  }
+
+  // Guild stat bonuses display
+  const statBonuses = getGuildStatBonuses();
+  let statBonusHtml = "";
+  if (statBonuses.hp > 0) {
+    statBonusHtml = `<div style="font-size:11px; color:var(--safe); margin-top:4px;">
+      Guild Bonus: +${Math.round(statBonuses.hp * 100)}% HP · +${Math.round(statBonuses.atk * 100)}% ATK · +${Math.round(statBonuses.def * 100)}% DEF
+    </div>`;
+  }
+
   container.innerHTML = `
     <div class="details-card" style="text-align:center;">
       <div style="font-size:40px; margin-bottom:8px;">🏰</div>
       <h3>${g.name}</h3>
+      ${statBonusHtml}
       <div style="display:flex; justify-content:center; gap:12px; margin:8px 0; flex-wrap:wrap;">
         <span style="font-family:var(--mono); font-size:13px; color:var(--text-dim);">Level ${g.level}</span>
         <span style="font-family:var(--mono); font-size:13px; color:var(--gold);">${g.perks.length} / ${allKeys.length} Perks</span>
         <span style="font-family:var(--mono); font-size:13px; color:var(--text-dim);">Members: ${g.members}</span>
       </div>
+      ${membersHtml}
       <div class="xp-bar" style="width:100%; margin:8px 0;"><div class="xp-fill" style="width:${Math.min(100, (g.xp / guildXpNeeded) * 100)}%"></div></div>
       <div style="font-size:11px; color:var(--text-dim); font-family:var(--mono); margin-bottom:8px;">Guild XP: ${formatNum(g.xp)} / ${formatNum(guildXpNeeded)}</div>
     </div>
@@ -1378,6 +1449,13 @@ function showGuildDashboard(container) {
         <div style="font-size:11px; color:var(--gold-dim);">100 🪙 → 50 Guild XP</div>
       </div>
       <button class="btn gold" id="btn-guild-donate" style="width:auto; padding:10px 20px;">Donate</button>
+    </div>
+    <div class="details-card" id="guild-recruit-section">
+      ${recruitHtml}
+      ${chatHtml}
+    </div>
+    <div class="details-card" style="text-align:center;">
+      <button class="btn ghost" id="btn-guild-leaderboard" style="border-color:var(--gold-dim); color:var(--gold);">🏅 View Guild Leaderboard</button>
     </div>
   `;
 
@@ -1400,6 +1478,7 @@ function showGuildDashboard(container) {
     save.gold -= 100;
     save.guild.donated += 100;
     save.guild.xp += 50;
+    addGuildChat("🪙", "A member donated 100 🪙 to the guild!");
     const prevLevel = save.guild.level;
     while (save.guild.xp >= save.guild.level * 300) {
       save.guild.xp -= save.guild.level * 300;
@@ -1410,6 +1489,9 @@ function showGuildDashboard(container) {
       let msg = `Guild leveled up to Lv.${save.guild.level}!`;
       if (newUnlocked.length > 0) {
         msg += `<br><br>New perks available:<br>${newUnlocked.map(k => `${GUILD_PERK_DEFS[k].icon} ${GUILD_PERK_DEFS[k].name}`).join("<br>")}`;
+        addGuildChat("🏅", `Guild reached Lv.${save.guild.level} — new perks unlocked!`);
+      } else {
+        addGuildChat("🏅", `Guild reached Lv.${save.guild.level}!`);
       }
       saveGame();
       refreshHome();
@@ -1422,6 +1504,207 @@ function showGuildDashboard(container) {
       showModal({ icon: "🏴", title: "Donation", message: "Donated 100 🪙 to the guild! Guild gained 50 XP." });
     }
   };
+
+  // Recruit handlers
+  document.querySelectorAll(".btn-recruit-accept").forEach(btn => {
+    btn.onclick = () => acceptRecruit(parseInt(btn.dataset.idx));
+  });
+  document.querySelectorAll(".btn-recruit-decline").forEach(btn => {
+    btn.onclick = () => declineRecruit(parseInt(btn.dataset.idx));
+  });
+
+  // Guild leaderboard button
+  const lbBtn = document.getElementById("btn-guild-leaderboard");
+  if (lbBtn) {
+    lbBtn.onclick = () => {
+      const guildContainer = document.getElementById("guild-content");
+      showGuildLeaderboard(guildContainer);
+    };
+  }
+}
+
+// --- GUILD XP SYSTEM ---
+function addGuildXp(amount) {
+  if (!save.guild) return false;
+  const g = save.guild;
+  const prevLevel = g.level;
+  g.xp += amount;
+  let leveledUp = false;
+  while (g.xp >= g.level * 300) {
+    g.xp -= g.level * 300;
+    g.level++;
+    leveledUp = true;
+  }
+  if (leveledUp) {
+    const newUnlocked = getUnlockedPerks(g.level).filter(k => !g.perks.includes(k));
+    let msg = `Guild leveled up to Lv.${g.level}!`;
+    if (newUnlocked.length > 0) {
+      msg += `<br><br>New perks available:<br>${newUnlocked.map(k => `${GUILD_PERK_DEFS[k].icon} ${GUILD_PERK_DEFS[k].name}`).join("<br>")}`;
+      addGuildChat("🏅", `Guild reached Lv.${g.level} — new perks unlocked!`);
+    } else {
+      addGuildChat("🏅", `Guild reached Lv.${g.level}!`);
+    }
+    saveGame();
+    refreshHome();
+    showModal({ icon: "🏴", title: "Guild Level Up!", message: msg });
+  }
+  saveGame();
+  return leveledUp;
+}
+
+// --- GUILD CHAT LOG ---
+function addGuildChat(icon, message) {
+  if (!save.guild) return;
+  if (!save.guild.chatLog) save.guild.chatLog = [];
+  save.guild.chatLog.unshift({ icon: icon, message: message, time: Date.now() });
+  if (save.guild.chatLog.length > 50) save.guild.chatLog.length = 50;
+  saveGame();
+}
+
+function formatGuildTime(timestamp) {
+  const diff = Date.now() - timestamp;
+  if (diff < 60000) return "just now";
+  if (diff < 3600000) return Math.floor(diff / 60000) + "m ago";
+  if (diff < 86400000) return Math.floor(diff / 3600000) + "h ago";
+  return Math.floor(diff / 86400000) + "d ago";
+}
+
+// --- GUILD RECRUITMENT ---
+const NPC_RECRUIT_NAMES = [
+  "Lyra", "Borin", "Sera", "Kael", "Mira", "Torvin",
+  "Elara", "Fenris", "Vex", "Nyx", "Runa", "Theo"
+];
+
+function generateGuildRecruit() {
+  if (!save.guild) return;
+  if (save.guild.recruits && save.guild.recruits.length >= 3) return;
+  if (save.guild.recruitCooldown && Date.now() < save.guild.recruitCooldown) return;
+  const pool = NPC_RECRUIT_NAMES.filter(n => !(save.guild.memberNames || []).includes(n) && !(save.guild.recruits || []).some(r => r.name === n));
+  if (pool.length === 0) return;
+  const name = pool[Math.floor(Math.random() * pool.length)];
+  const types = ["ember", "aqua", "verdant", "volt", "stone", "gale"];
+  const type = types[Math.floor(Math.random() * types.length)];
+  const level = save.guild.level + Math.floor(Math.random() * 3) + 1;
+  if (!save.guild.recruits) save.guild.recruits = [];
+  save.guild.recruits.push({ name, type, level });
+  save.guild.recruitCooldown = Date.now() + 120000; // 2 min cooldown
+  addGuildChat("👋", `${name} (${type}, Lv.${level}) wants to join the guild!`);
+  saveGame();
+}
+
+function acceptRecruit(index) {
+  if (!save.guild || !save.guild.recruits) return;
+  const recruit = save.guild.recruits[index];
+  if (!recruit) return;
+  if (!save.guild.memberNames) save.guild.memberNames = [];
+  save.guild.memberNames.push(recruit.name);
+  save.guild.members = save.guild.memberNames.length + 1;
+  save.guild.recruits.splice(index, 1);
+  addGuildChat("🎉", `${recruit.name} joined the guild!`);
+  addGuildXp(50);
+  saveGame();
+  refreshHome();
+  initGuildUI();
+}
+
+function declineRecruit(index) {
+  if (!save.guild || !save.guild.recruits) return;
+  const recruit = save.guild.recruits[index];
+  if (!recruit) return;
+  save.guild.recruits.splice(index, 1);
+  addGuildChat("👋", `${recruit.name}'s application was declined.`);
+  saveGame();
+  initGuildUI();
+}
+
+// --- GUILD STAT BONUSES ---
+function getGuildStatBonuses() {
+  const bonuses = { hp: 0, atk: 0, def: 0, spd: 0 };
+  if (!save.guild) return bonuses;
+  const g = save.guild;
+  if (!g.perks) g.perks = [g.perk];
+  // Unity perk: stat bonuses scale with guild level
+  if (g.perks.includes("unity")) {
+    const val = getGuildPerkValue("unity", g.level) / 100;
+    const statBonus = 0.03 + g.level * 0.005;
+    bonuses.hp += statBonus;
+    bonuses.atk += statBonus;
+    bonuses.def += statBonus;
+    bonuses.spd += statBonus;
+  }
+  // Base guild-wide stat bonus: +2% per guild level
+  const baseBonus = g.level * 0.02;
+  bonuses.hp += baseBonus;
+  bonuses.atk += baseBonus;
+  bonuses.def += baseBonus;
+  bonuses.spd += baseBonus;
+  return bonuses;
+}
+
+// --- GUILD LEADERBOARD ---
+const NPC_GUILDS = [
+  { name: "Ember Legion", level: 8, xp: 1800, memberCount: 12, badge: "👑" },
+  { name: "Abyss Stalkers", level: 6, xp: 900, memberCount: 9, badge: "🥇" },
+  { name: "Storm Vanguard", level: 5, xp: 450, memberCount: 7, badge: "🥈" },
+  { name: "Verdant Circle", level: 4, xp: 280, memberCount: 6, badge: "🥈" },
+  { name: "Crystal Sentinels", level: 3, xp: 120, memberCount: 5, badge: "🥉" },
+  { name: "Shadow Pact", level: 2, xp: 60, memberCount: 4, badge: "🥉" },
+  { name: "Thunder Cohort", level: 1, xp: 10, memberCount: 3, badge: "" }
+];
+
+function getGuildTotalXp(g) {
+  let xp = g.xp || 0;
+  for (let i = 1; i < g.level; i++) {
+    xp += i * 300;
+  }
+  return xp;
+}
+
+function showGuildLeaderboard(container) {
+  const allGuilds = NPC_GUILDS.map(g => ({ ...g, totalXp: getGuildTotalXp(g) }));
+  if (save.guild) {
+    allGuilds.push({
+      name: save.guild.name,
+      level: save.guild.level,
+      xp: save.guild.xp,
+      totalXp: getGuildTotalXp(save.guild),
+      memberCount: save.guild.members,
+      badge: "⭐",
+      isPlayer: true
+    });
+  }
+  allGuilds.sort((a, b) => b.totalXp - a.totalXp);
+  
+  let html = `<div class="details-card" style="text-align:center;">
+    <h3>🏅 Guild Leaderboard</h3>
+    <p class="subtitle">Guilds ranked by total experience earned</p>
+  </div>
+  <div class="lb-ladder">`;
+
+  allGuilds.forEach((g, i) => {
+    const isPlayer = g.isPlayer;
+    const cls = isPlayer ? "lb-row lb-row-player" : "lb-row";
+    const rankIcon = i === 0 ? "👑" : i < 3 ? "🥇" : i < 5 ? "🥈" : i < 7 ? "🥉" : `#${i + 1}`;
+    html += `<div class="${cls}">
+      <div class="lb-rank" style="font-size:16px;">${rankIcon}</div>
+      <div class="lb-info">
+        <div class="lb-npc-name">${g.badge} ${g.name}${isPlayer ? ' (You)' : ''}</div>
+        <div class="lb-npc-stats">Lv.${g.level} · ${g.memberCount} members</div>
+      </div>
+      <div class="lb-vp">${formatNum(g.totalXp)} XP</div>
+    </div>`;
+  });
+
+  html += `</div>
+  <button class="btn ghost" id="btn-guild-back" style="margin-top:12px; border-color:var(--gold-dim); color:var(--gold);">← Back to Guild</button>`;
+  container.innerHTML = html;
+
+  const backBtn = document.getElementById("btn-guild-back");
+  if (backBtn) {
+    backBtn.onclick = () => {
+      initGuildUI();
+    };
+  }
 }
 
 // --- DUNGEON / RAID SYSTEM ---
@@ -1726,6 +2009,10 @@ function handleDungeonFloorEnd(won) {
       save.bag[itemKey]++;
     });
 
+    // Guild XP from dungeon floor
+    if (typeof addGuildXp === "function") addGuildXp(20 + currentFloor * 5);
+    if (typeof addGuildChat === "function" && save.guild) addGuildChat("🏛️", `${dd.name} Floor ${currentFloor} cleared!`);
+
     if (currentFloor === dd.floors) {
       if (lootInfo.rareMonChance && Math.random() < lootInfo.rareMonChance) {
         const pool = ROSTER_DEF.map(r => r[0]);
@@ -1859,7 +2146,7 @@ function dungeonComplete() {
 }
 
 function getGuildRewardMultipliers() {
-  const mults = { gold: 1, xp: 1, explore: 1, training: 1, shop: 1 };
+  const mults = { gold: 1, xp: 1, explore: 1, training: 1, shop: 1, loot: 1, battleRush: 1, unity: 1 };
   if (!save.guild) return mults;
   const g = save.guild;
   if (!g.perks) g.perks = [g.perk];
@@ -1871,6 +2158,9 @@ function getGuildRewardMultipliers() {
     if (k === "training") mults.training = 1 - val;
     if (k === "shop") mults.shop = 1 - val;
     if (k === "goldFind") { mults.gold = mults.gold * (1 + val); mults.explore = mults.explore * (1 + val); }
+    if (k === "lootFinder") mults.loot = 1 + val;
+    if (k === "battleRush") mults.battleRush = 1 - val;
+    if (k === "unity") mults.unity = 1 + val;
   });
   return mults;
 }
