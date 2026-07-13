@@ -473,6 +473,15 @@ function checkAndApplyCombo(side, attacker, defender, mv, dmg, logLines, arena) 
   if (tracker.length > 3) tracker.shift();
   const comboApplied = { active: false, name: "", icon: "", desc: "", bonusDmg: 0 };
 
+  // Unity perk: combo damage bonus when guild members' creatures are in play
+  let unityMult = 1;
+  if (typeof getGuildRewardMultipliers === "function" && save.guild) {
+    const mults = getGuildRewardMultipliers();
+    if (mults.unity > 1 && side === "p") {
+      unityMult = mults.unity;
+    }
+  }
+
   for (let len = 3; len >= 2; len--) {
     if (tracker.length < len) continue;
     const seq = tracker.slice(tracker.length - len);
@@ -486,7 +495,7 @@ function checkAndApplyCombo(side, attacker, defender, mv, dmg, logLines, arena) 
     comboApplied.desc = combo.desc;
 
     if (combo.effect === "dmgBoost") {
-      const bonus = Math.round(dmg * (combo.mult - 1));
+      const bonus = Math.round(dmg * (combo.mult - 1) * unityMult);
       defender.hp = Math.max(0, defender.hp - bonus);
       if (arena) {
         const defEl = document.getElementById(side === "p" ? "foe-mon" : "player-mon");
@@ -530,7 +539,7 @@ function checkAndApplyCombo(side, attacker, defender, mv, dmg, logLines, arena) 
         }
       });
     } else if (combo.effect === "spdDmg") {
-      const spdBonus = Math.round(attacker.spd * combo.mult);
+      const spdBonus = Math.round(attacker.spd * combo.mult * unityMult);
       defender.hp = Math.max(0, defender.hp - spdBonus);
       comboApplied.bonusDmg = spdBonus;
       if (arena) {
@@ -915,6 +924,9 @@ function getMonData(uid) {
   // Talent stat bonuses
   const talentBonuses = getTalentStatBonuses(mSave.uid);
 
+  // Guild stat bonuses
+  const guildBonuses = typeof getGuildStatBonuses === "function" ? getGuildStatBonuses() : { hp: 0, atk: 0, def: 0, spd: 0 };
+
   const variantKey = mSave.variant || null;
   const variantDef = variantKey ? VARIANTS[variantKey] : null;
   const vMod = variantDef ? variantDef.statMods : { hp: 1, atk: 1, def: 1, spd: 1 };
@@ -929,10 +941,10 @@ function getMonData(uid) {
 
   return {
     uid: mSave.uid, baseId: def[0], name: displayName, type: displayType,
-    baseHp: Math.floor(def[3] * scale * hpBonus * vMod.hp * evoMult * (1 + equipHp) * (1 + talentBonuses.hp)),
-    atk: Math.floor(def[4] * scale * atkBonus * vMod.atk * evoMult * (1 + equipAtk) * (1 + talentBonuses.atk)),
-    def: Math.floor(def[5] * scale * defBonus * vMod.def * evoMult * (1 + equipDef) * (1 + talentBonuses.def)),
-    spd: Math.floor(def[6] * scale * spdBonus * vMod.spd * evoMult * (1 + equipSpd) * (1 + talentBonuses.spd)),
+    baseHp: Math.floor(def[3] * scale * hpBonus * vMod.hp * evoMult * (1 + equipHp) * (1 + talentBonuses.hp) * (1 + guildBonuses.hp)),
+    atk: Math.floor(def[4] * scale * atkBonus * vMod.atk * evoMult * (1 + equipAtk) * (1 + talentBonuses.atk) * (1 + guildBonuses.atk)),
+    def: Math.floor(def[5] * scale * defBonus * vMod.def * evoMult * (1 + equipDef) * (1 + talentBonuses.def) * (1 + guildBonuses.def)),
+    spd: Math.floor(def[6] * scale * spdBonus * vMod.spd * evoMult * (1 + equipSpd) * (1 + talentBonuses.spd) * (1 + guildBonuses.spd)),
     item: mSave.heldItem, sigName: def[8], shape: def[9],
     level: lvl, xp: mSave.xp, onExpedition: mSave.onExpedition,
     maxXp: getMonMaxXp(lvl),
@@ -1055,6 +1067,12 @@ function refreshHome() {
   if (typeof updateDungeonDash === "function") updateDungeonDash();
   if (typeof initDailyLoginUI === "function") initDailyLoginUI();
   if (typeof initGuildUI === "function") initGuildUI();
+  // Update guild dash status
+  const guildDash = document.getElementById("guild-dash");
+  if (guildDash) {
+    if (save.guild) guildDash.textContent = `Lv.${save.guild.level}`;
+    else guildDash.textContent = "Create";
+  }
 }
 
 setInterval(() => {
@@ -2544,6 +2562,9 @@ function endBattle(won) {
     if (!save._currentStreak) save._currentStreak = 0;
     save._currentStreak++;
     if (save._currentStreak > save.stats.bestStreak) save.stats.bestStreak = save._currentStreak;
+    // Guild XP from battle win
+    if (typeof addGuildXp === "function") addGuildXp(30);
+    if (typeof addGuildChat === "function" && save.guild) addGuildChat("⚔️", `A ranked battle was won against ${battle.opponentName}!`);
   } else {
     save.losses++;
     save._currentStreak = 0;
@@ -2606,6 +2627,10 @@ function handleTourneyMatchEnd(won) {
   const goldReward = Math.round((won ? 40 : 10) * guildMults.gold);
   save.gold += goldReward;
   save.playerXp += xpReward;
+  if (won) {
+    if (typeof addGuildXp === "function") addGuildXp(40);
+    if (typeof addGuildChat === "function" && save.guild) addGuildChat("🏆", `A tournament match was won against ${battle.opponentName}!`);
+  }
 
   battle.player.forEach(m => {
     let mSave = save.mons.find(x => x.uid === m.uid);

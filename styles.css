@@ -872,3 +872,11 @@ select.btn.ghost option { background: var(--bg); color: white; }
   font-family: var(--mono);
   letter-spacing: 0.3px;
 }
+
+/* --- Guild Activity / Recruitment --- */
+.badge.t-ember { color: var(--ember); }
+.badge.t-aqua { color: var(--aqua); }
+.badge.t-verdant { color: var(--verdant); }
+.badge.t-volt { color: var(--volt); }
+.badge.t-stone { color: var(--stone); }
+.badge.t-gale { color: var(--gale); }
