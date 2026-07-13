@@ -80,6 +80,259 @@ const VARIANTS = {
   toxic: { name: "Toxic", icon: "☠️", desc: "Poison-infused, high SPD+ATK", statMods: { spd: 1.25, atk: 1.15, def: 0.9, hp: 0.95 } }
 };
 
+/* ============================= TALENT MASTERY SYSTEM ============================= */
+const TALENT_TREES = {
+  ember: {
+    name: "Ember", icon: "🔥", color: "#ff6a45",
+    nodes: [
+      { id: "ember_hp",   name: "Ember Vitality",   icon: "❤️",   desc: "+10% HP",        stat: "hp",  bonus: 0.10, cost: 2, req: null },
+      { id: "ember_atk",  name: "Ember Strength",   icon: "⚔️",   desc: "+10% ATK",       stat: "atk", bonus: 0.10, cost: 2, req: null },
+      { id: "ember_def",  name: "Ember Shell",      icon: "🛡️",   desc: "+10% DEF",       stat: "def", bonus: 0.10, cost: 2, req: null },
+      { id: "ember_spd",  name: "Ember Swift",      icon: "💨",   desc: "+10% SPD",       stat: "spd", bonus: 0.10, cost: 2, req: null },
+      { id: "ember_inferno", name: "Inferno",       icon: "🌋",   desc: "+15% burn chance on attacks", perk: "inferno", cost: 4, req: ["ember_atk"] }
+    ]
+  },
+  aqua: {
+    name: "Aqua", icon: "🌊", color: "#33c7ea",
+    nodes: [
+      { id: "aqua_hp",   name: "Aqua Vitality",   icon: "❤️",   desc: "+10% HP",      stat: "hp",  bonus: 0.10, cost: 2, req: null },
+      { id: "aqua_atk",  name: "Aqua Strength",   icon: "⚔️",   desc: "+10% ATK",     stat: "atk", bonus: 0.10, cost: 2, req: null },
+      { id: "aqua_def",  name: "Aqua Shell",      icon: "🛡️",   desc: "+10% DEF",     stat: "def", bonus: 0.10, cost: 2, req: null },
+      { id: "aqua_spd",  name: "Aqua Swift",      icon: "💨",   desc: "+10% SPD",     stat: "spd", bonus: 0.10, cost: 2, req: null },
+      { id: "aqua_tide", name: "Tide Healer",     icon: "💧",   desc: "Heal 8% HP on switch-in", perk: "tide", cost: 4, req: ["aqua_hp"] }
+    ]
+  },
+  verdant: {
+    name: "Verdant", icon: "🌿", color: "#5fd66b",
+    nodes: [
+      { id: "verdant_hp",   name: "Verdant Vitality", icon: "❤️",   desc: "+10% HP",         stat: "hp",  bonus: 0.10, cost: 2, req: null },
+      { id: "verdant_atk",  name: "Verdant Strength", icon: "⚔️",   desc: "+10% ATK",        stat: "atk", bonus: 0.10, cost: 2, req: null },
+      { id: "verdant_def",  name: "Verdant Shell",    icon: "🛡️",   desc: "+10% DEF",        stat: "def", bonus: 0.10, cost: 2, req: null },
+      { id: "verdant_spd",  name: "Verdant Swift",    icon: "💨",   desc: "+10% SPD",        stat: "spd", bonus: 0.10, cost: 2, req: null },
+      { id: "verdant_thorn", name: "Thornmail",       icon: "🌵",   desc: "+15% thorns reflect", perk: "thornmail", cost: 4, req: ["verdant_def"] }
+    ]
+  },
+  volt: {
+    name: "Volt", icon: "⚡", color: "#f4d33c",
+    nodes: [
+      { id: "volt_hp",   name: "Volt Vitality",   icon: "❤️",   desc: "+10% HP",       stat: "hp",  bonus: 0.10, cost: 2, req: null },
+      { id: "volt_atk",  name: "Volt Strength",   icon: "⚔️",   desc: "+10% ATK",      stat: "atk", bonus: 0.10, cost: 2, req: null },
+      { id: "volt_def",  name: "Volt Shell",      icon: "🛡️",   desc: "+10% DEF",      stat: "def", bonus: 0.10, cost: 2, req: null },
+      { id: "volt_spd",  name: "Volt Swift",      icon: "💨",   desc: "+10% SPD",      stat: "spd", bonus: 0.10, cost: 2, req: null },
+      { id: "volt_overcharge", name: "Overcharge", icon: "🔋",   desc: "+20% Static speed bonus", perk: "overcharge", cost: 4, req: ["volt_spd"] }
+    ]
+  },
+  stone: {
+    name: "Stone", icon: "🪨", color: "#c98a52",
+    nodes: [
+      { id: "stone_hp",   name: "Stone Vitality",   icon: "❤️",   desc: "+10% HP",        stat: "hp",  bonus: 0.10, cost: 2, req: null },
+      { id: "stone_atk",  name: "Stone Strength",   icon: "⚔️",   desc: "+10% ATK",       stat: "atk", bonus: 0.10, cost: 2, req: null },
+      { id: "stone_def",  name: "Stone Shell",      icon: "🛡️",   desc: "+10% DEF",       stat: "def", bonus: 0.10, cost: 2, req: null },
+      { id: "stone_spd",  name: "Stone Swift",      icon: "💨",   desc: "+10% SPD",       stat: "spd", bonus: 0.10, cost: 2, req: null },
+      { id: "stone_fortress", name: "Fortress",     icon: "🏰",   desc: "+15% Fortify defense boost", perk: "fortress", cost: 4, req: ["stone_def"] }
+    ]
+  },
+  gale: {
+    name: "Gale", icon: "💨", color: "#9db4ff",
+    nodes: [
+      { id: "gale_hp",   name: "Gale Vitality",   icon: "❤️",   desc: "+10% HP",       stat: "hp",  bonus: 0.10, cost: 2, req: null },
+      { id: "gale_atk",  name: "Gale Strength",   icon: "⚔️",   desc: "+10% ATK",      stat: "atk", bonus: 0.10, cost: 2, req: null },
+      { id: "gale_def",  name: "Gale Shell",      icon: "🛡️",   desc: "+10% DEF",      stat: "def", bonus: 0.10, cost: 2, req: null },
+      { id: "gale_spd",  name: "Gale Swift",      icon: "💨",   desc: "+10% SPD",      stat: "spd", bonus: 0.10, cost: 2, req: null },
+      { id: "gale_phantom", name: "Phantom Step", icon: "👻",   desc: "+15% Evasion dodge chance", perk: "phantom", cost: 4, req: ["gale_spd"] }
+    ]
+  }
+};
+
+function getTalentTree(type) {
+  return TALENT_TREES[type] || null;
+}
+
+function getOwnedTalents(uid) {
+  const mSave = save.mons.find(m => m.uid === uid);
+  return mSave ? (mSave.talents || []) : [];
+}
+
+function hasTalent(uid, talentId) {
+  return getOwnedTalents(uid).includes(talentId);
+}
+
+function getTalentNode(tree, talentId) {
+  if (!tree) return null;
+  return tree.nodes.find(n => n.id === talentId) || null;
+}
+
+function meetsTalentReqs(uid, node) {
+  if (!node.req || node.req.length === 0) return true;
+  return node.req.every(r => hasTalent(uid, r));
+}
+
+function getMasteryPoints(uid) {
+  const mSave = save.mons.find(m => m.uid === uid);
+  return mSave ? (mSave.mp || 0) : 0;
+}
+
+function awardMasteryPoints(uid, amount) {
+  const mSave = save.mons.find(m => m.uid === uid);
+  if (!mSave) return;
+  mSave.mp = (mSave.mp || 0) + amount;
+  saveGame();
+}
+
+function awardAllMasteryPoints(amount) {
+  save.mons.forEach(m => {
+    m.mp = (m.mp || 0) + amount;
+  });
+  saveGame();
+}
+
+function purchaseTalent(uid, talentId) {
+  const mSave = save.mons.find(m => m.uid === uid);
+  if (!mSave) return false;
+  const def = ROSTER_DEF.find(r => r[0] === mSave.baseId);
+  if (!def) return false;
+  const tree = getTalentTree(def[2]);
+  if (!tree) return false;
+  const node = getTalentNode(tree, talentId);
+  if (!node) return false;
+  if (!mSave.talents) mSave.talents = [];
+  if (mSave.talents.includes(talentId)) return false;
+  if (!meetsTalentReqs(uid, node)) return false;
+  if ((mSave.mp || 0) < node.cost) return false;
+  mSave.mp = (mSave.mp || 0) - node.cost;
+  mSave.talents.push(talentId);
+  saveGame();
+  return true;
+}
+
+function getTalentStatBonuses(uid) {
+  const mSave = save.mons.find(m => m.uid === uid);
+  if (!mSave || !mSave.talents) return { hp: 0, atk: 0, def: 0, spd: 0 };
+  const def = ROSTER_DEF.find(r => r[0] === mSave.baseId);
+  if (!def) return { hp: 0, atk: 0, def: 0, spd: 0 };
+  const tree = getTalentTree(def[2]);
+  if (!tree) return { hp: 0, atk: 0, def: 0, spd: 0 };
+  const bonuses = { hp: 0, atk: 0, def: 0, spd: 0 };
+  mSave.talents.forEach(id => {
+    const node = getTalentNode(tree, id);
+    if (node && node.stat) {
+      bonuses[node.stat] = (bonuses[node.stat] || 0) + node.bonus;
+    }
+  });
+  return bonuses;
+}
+
+function hasTalentPerk(uid, perk) {
+  const mSave = save.mons.find(m => m.uid === uid);
+  if (!mSave || !mSave.talents) return false;
+  const def = ROSTER_DEF.find(r => r[0] === mSave.baseId);
+  if (!def) return false;
+  const tree = getTalentTree(def[2]);
+  if (!tree) return false;
+  return mSave.talents.some(id => {
+    const node = getTalentNode(tree, id);
+    return node && node.perk === perk;
+  });
+}
+
+function getTalentPerkDescriptions(uid) {
+  const descs = [];
+  const mSave = save.mons.find(m => m.uid === uid);
+  if (!mSave || !mSave.talents) return descs;
+  const def = ROSTER_DEF.find(r => r[0] === mSave.baseId);
+  if (!def) return descs;
+  const tree = getTalentTree(def[2]);
+  if (!tree) return descs;
+  mSave.talents.forEach(id => {
+    const node = getTalentNode(tree, id);
+    if (node && node.perk) {
+      descs.push(node.desc);
+    }
+  });
+  return descs;
+}
+
+function showTalentTree(uid) {
+  const mSave = save.mons.find(m => m.uid === uid);
+  if (!mSave) return;
+  const def = ROSTER_DEF.find(r => r[0] === mSave.baseId);
+  if (!def) return;
+  const tree = getTalentTree(def[2]);
+  if (!tree) return;
+  const mp = getMasteryPoints(uid);
+  const owned = getOwnedTalents(uid);
+
+  let html = `<div class="talent-overlay" id="talent-overlay">
+    <div class="talent-modal">
+      <div class="backrow"><button class="iconbtn" id="btn-talent-close">←</button><h2 style="color:${tree.color};">${tree.icon} ${tree.name} Talent Mastery</h2></div>
+      <div class="talent-mp-bar">✦ <span id="talent-mp-display">${mp}</span> Mastery Points</div>
+      <div class="talent-grid">`;
+
+  tree.nodes.forEach((node, idx) => {
+    const isOwned = owned.includes(node.id);
+    const canBuy = !isOwned && meetsTalentReqs(uid, node) && mp >= node.cost;
+    const locked = !meetsTalentReqs(uid, node);
+    const cls = isOwned ? "talent-node owned" : canBuy ? "talent-node available" : "talent-node locked";
+
+    let reqHtml = "";
+    if (node.req && node.req.length > 0 && !isOwned) {
+      const reqsMet = node.req.every(r => owned.includes(r));
+      reqHtml = `<div class="talent-req" style="color:${reqsMet ? 'var(--safe)' : 'var(--danger)'};">Requires: ${node.req.map(r => {
+        const n = TALENT_TREES[def[2]] ? TALENT_TREES[def[2]].nodes.find(x => x.id === r) : null;
+        return n ? n.name : r;
+      }).join(", ")}</div>`;
+    }
+
+    html += `<div class="${cls}" data-talent-id="${node.id}">
+      <div class="talent-node-icon" style="border-color:${tree.color};${isOwned ? `background:${tree.color}33;` : ''}">${node.icon}</div>
+      <div class="talent-node-info">
+        <div class="talent-node-name">${node.name}</div>
+        <div class="talent-node-desc">${node.desc}</div>
+        ${reqHtml}
+        <div class="talent-node-cost">${isOwned ? '✓ Owned' : canBuy ? `🔓 ${node.cost} MP` : locked ? `🔒 ${node.cost} MP` : `🔒 ${node.cost} MP`}</div>
+      </div>
+      ${canBuy ? `<button class="btn-talent-buy" data-talent-id="${node.id}">Learn</button>` : ''}
+    </div>`;
+  });
+
+  html += `</div>
+    <div class="talent-perks" id="talent-perks-display"></div>
+    </div></div>`;
+
+  const existing = document.getElementById("talent-overlay");
+  if (existing) existing.remove();
+
+  const div = document.createElement("div");
+  div.innerHTML = html;
+  document.getElementById("app").appendChild(div.firstElementChild);
+
+  document.getElementById("btn-talent-close").onclick = () => {
+    document.getElementById("talent-overlay").remove();
+  };
+
+  document.querySelectorAll(".btn-talent-buy").forEach(btn => {
+    btn.onclick = () => {
+      const talentId = btn.dataset.talentId;
+      const success = purchaseTalent(uid, talentId);
+      if (success) {
+        showModal({ icon: "✦", title: "Talent Unlocked!", message: `Learned ${tree.nodes.find(n => n.id === talentId)?.name}!` });
+        showTalentTree(uid);
+      } else {
+        showModal({ icon: "⚠️", title: "Cannot Learn", message: "Not enough Mastery Points or requirements not met." });
+      }
+    };
+  });
+
+  // Show active perk descriptions
+  const perkDescs = getTalentPerkDescriptions(uid);
+  const perksEl = document.getElementById("talent-perks-display");
+  if (perksEl) {
+    if (perkDescs.length > 0) {
+      perksEl.innerHTML = `<div class="talent-perks-title">Active Perks:</div><div class="talent-perks-list">${perkDescs.map(d => `<div class="talent-perk-tag">✦ ${d}</div>`).join("")}</div>`;
+    }
+  }
+}
+
 const ACHIEVEMENT_CATEGORIES = {
   battle: { name: "Battle", icon: "⚔️", color: "#ff6a45" },
   collection: { name: "Collection", icon: "🐾", color: "#c084fc" },
@@ -146,22 +399,22 @@ function typeMultiplier(atkType, defType) { return (atkType === "neutral") ? 1 :
 
 const PASSIVE_ABILITIES = {
   ember: { name:"Blaze", icon:"🔥", desc:"15% chance to burn attackers when hit", 
-    onHit(owner, attacker) { if (Math.random() < 0.15 && !owner.fainted) { applyStatus(attacker, "burn"); return true; } return false; },
+    onHit(owner, attacker) { const hasPerk = typeof hasTalentPerk === "function" && owner.uid && hasTalentPerk(owner.uid, "inferno"); const chance = hasPerk ? 0.30 : 0.15; if (Math.random() < chance && !owner.fainted) { applyStatus(attacker, "burn"); return true; } return false; },
     getEvoDesc:(lvl)=>`${Math.min(35, 15 + Math.floor(lvl/3))}% chance to burn attackers` },
   aqua: { name:"Tide", icon:"🌊", desc:"Heal 5% max HP at start of each turn",
     onTurnStart(owner) { if (!owner.fainted && owner.hp < owner.baseHp) { const pct = 0.05 + (owner.level||1) * 0.002; const amt = Math.max(1, Math.floor(owner.baseHp * Math.min(0.12, pct))); owner.hp = Math.min(owner.baseHp, owner.hp + amt); return amt; } return 0; },
     getEvoDesc:(lvl)=>`Heal ${Math.min(12, 5 + Math.floor(lvl/2))}% max HP each turn` },
   verdant: { name:"Thorns", icon:"🌿", desc:"Reflect 20% of damage back to attacker",
-    onHit(owner, attacker) { if (!owner.fainted && !attacker.fainted) { const reflectPct = 0.20 + (owner.level||1) * 0.003; const reflect = Math.max(1, Math.floor(owner._lastDmg * Math.min(0.4, reflectPct))); attacker.hp = Math.max(0, attacker.hp - reflect); return reflect; } return 0; },
+    onHit(owner, attacker) { if (!owner.fainted && !attacker.fainted) { const hasPerk = typeof hasTalentPerk === "function" && owner.uid && hasTalentPerk(owner.uid, "thornmail"); const baseReflect = hasPerk ? 0.35 : 0.20; const reflectPct = baseReflect + (owner.level||1) * 0.003; const reflect = Math.max(1, Math.floor(owner._lastDmg * Math.min(0.5, reflectPct))); attacker.hp = Math.max(0, attacker.hp - reflect); return reflect; } return 0; },
     getEvoDesc:(lvl)=>`Reflect ${Math.min(40, 20 + Math.floor(lvl/2))}% damage back` },
   volt: { name:"Static", icon:"⚡", desc:"+15% Speed in battle", 
-    onInit(owner) { const boost = 1.15 + (owner.level||1) * 0.003; owner.spd = Math.floor(owner._baseSpd * Math.min(1.35, boost)); },
+    onInit(owner) { const hasPerk = typeof hasTalentPerk === "function" && owner.uid && hasTalentPerk(owner.uid, "overcharge"); const baseBoost = hasPerk ? 1.35 : 1.15; const boost = baseBoost + (owner.level||1) * 0.003; owner.spd = Math.floor(owner._baseSpd * Math.min(1.55, boost)); },
     getEvoDesc:(lvl)=>`+${Math.min(35, 15 + Math.floor(lvl/2))}% Speed in battle` },
   stone: { name:"Fortify", icon:"🪨", desc:"+15% Defense in battle",
-    onInit(owner) { const boost = 1.15 + (owner.level||1) * 0.003; owner.effDef = Math.floor(owner._baseDef * Math.min(1.35, boost)); },
+    onInit(owner) { const hasPerk = typeof hasTalentPerk === "function" && owner.uid && hasTalentPerk(owner.uid, "fortress"); const baseBoost = hasPerk ? 1.30 : 1.15; const boost = baseBoost + (owner.level||1) * 0.003; owner.effDef = Math.floor(owner._baseDef * Math.min(1.50, boost)); },
     getEvoDesc:(lvl)=>`+${Math.min(35, 15 + Math.floor(lvl/2))}% Defense in battle` },
   gale: { name:"Evasion", icon:"💨", desc:"10% chance to dodge attacks",
-    onDefend(owner) { const chance = 0.10 + (owner.level||1) * 0.002; return Math.random() < Math.min(0.25, chance); },
+    onDefend(owner) { const hasPerk = typeof hasTalentPerk === "function" && owner.uid && hasTalentPerk(owner.uid, "phantom"); const baseChance = hasPerk ? 0.25 : 0.10; const chance = baseChance + (owner.level||1) * 0.002; return Math.random() < Math.min(0.40, chance); },
     getEvoDesc:(lvl)=>`${Math.min(25, 10 + Math.floor(lvl/2))}% chance to dodge attacks` }
 };
 function getPassive(type) { return PASSIVE_ABILITIES[type] || null; }
@@ -595,7 +848,7 @@ function generateDefaultSave() {
     matchHistory: []
   };
   ["cindrake", "tidenne", "verdil", "sparkit"].forEach((id, i) => {
-    save.mons.push({ uid: "start_" + i, baseId: id, level: 1, xp: 0, heldItem: "none", equipment: { weapon: "none", armor: "none", accessory: "none" }, mergeBonuses: {}, onExpedition: false, evolved: false, variant: null });
+    save.mons.push({ uid: "start_" + i, baseId: id, level: 1, xp: 0, heldItem: "none", equipment: { weapon: "none", armor: "none", accessory: "none" }, mergeBonuses: {}, onExpedition: false, evolved: false, variant: null, mp: 0, talents: [] });
   });
   return save;
 }
@@ -607,6 +860,8 @@ let save = (function () {
   s.mons.forEach(m => {
     if (m.evolved === undefined) m.evolved = false;
     if (m.variant === undefined) m.variant = null;
+    if (m.mp === undefined) m.mp = 0;
+    if (m.talents === undefined) m.talents = [];
     if (m.equipment === undefined) {
       const itemKey = m.heldItem || "none";
       m.equipment = { weapon: "none", armor: "none", accessory: "none" };
@@ -657,6 +912,9 @@ function getMonData(uid) {
     }
   });
 
+  // Talent stat bonuses
+  const talentBonuses = getTalentStatBonuses(mSave.uid);
+
   const variantKey = mSave.variant || null;
   const variantDef = variantKey ? VARIANTS[variantKey] : null;
   const vMod = variantDef ? variantDef.statMods : { hp: 1, atk: 1, def: 1, spd: 1 };
@@ -671,10 +929,10 @@ function getMonData(uid) {
 
   return {
     uid: mSave.uid, baseId: def[0], name: displayName, type: displayType,
-    baseHp: Math.floor(def[3] * scale * hpBonus * vMod.hp * evoMult * (1 + equipHp)),
-    atk: Math.floor(def[4] * scale * atkBonus * vMod.atk * evoMult * (1 + equipAtk)),
-    def: Math.floor(def[5] * scale * defBonus * vMod.def * evoMult * (1 + equipDef)),
-    spd: Math.floor(def[6] * scale * spdBonus * vMod.spd * evoMult * (1 + equipSpd)),
+    baseHp: Math.floor(def[3] * scale * hpBonus * vMod.hp * evoMult * (1 + equipHp) * (1 + talentBonuses.hp)),
+    atk: Math.floor(def[4] * scale * atkBonus * vMod.atk * evoMult * (1 + equipAtk) * (1 + talentBonuses.atk)),
+    def: Math.floor(def[5] * scale * defBonus * vMod.def * evoMult * (1 + equipDef) * (1 + talentBonuses.def)),
+    spd: Math.floor(def[6] * scale * spdBonus * vMod.spd * evoMult * (1 + equipSpd) * (1 + talentBonuses.spd)),
     item: mSave.heldItem, sigName: def[8], shape: def[9],
     level: lvl, xp: mSave.xp, onExpedition: mSave.onExpedition,
     maxXp: getMonMaxXp(lvl),
@@ -829,7 +1087,7 @@ document.getElementById("card-summon").addEventListener("click", () => {
     const vKeys = Object.keys(VARIANTS);
     variant = vKeys[Math.floor(Math.random() * vKeys.length)];
   }
-  save.mons.push({ uid: uid, baseId: choice[0], level: 1, xp: 0, heldItem: "none", mergeBonuses: {}, onExpedition: false, evolved: false, variant: variant });
+  save.mons.push({ uid: uid, baseId: choice[0], level: 1, xp: 0, heldItem: "none", mergeBonuses: {}, onExpedition: false, evolved: false, variant: variant, mp: 0, talents: [] });
 
   if (typeof trackQuestProgress === "function") trackQuestProgress("summon", 1);
   saveGame(); refreshHome();
@@ -1026,6 +1284,7 @@ function showMonDetails(m) {
     
     <button class="btn gold" id="btn-lvlup" style="margin-top:10px;" ${m.onExpedition ? 'disabled' : ''}>Level Up (${formatNum(upgCost)} Gold)</button>
     ${(!m.evolved && m.evolvesAt > 0 && m.level >= m.evolvesAt) ? `<button class="btn gold" id="btn-evolve" style="margin-top:8px; background:linear-gradient(135deg, #c084fc, #8b5cf6); color:white; border:none;">✨ Evolve to ${m.evoName} (FREE)</button>` : ''}
+    <button class="btn ghost" id="btn-talents" style="margin-top:8px; border-color:var(--gold-dim); color:var(--gold);">✦ Talents Mastery (${getMasteryPoints(m.uid)} MP)</button>
   `;
 
   show("screen-details");
@@ -1035,6 +1294,7 @@ function showMonDetails(m) {
     save.gold -= upgCost;
     const mSave = save.mons.find(x => x.uid === m.uid);
     mSave.level++;
+    awardMasteryPoints(m.uid, 1);
     if (typeof trackQuestProgress === "function") trackQuestProgress("level_up", 1);
     saveGame();
     const updated = getMonData(m.uid);
@@ -1051,6 +1311,11 @@ function showMonDetails(m) {
     evolveBtn.onclick = () => {
       performEvolution(m.uid);
     };
+  }
+
+  const talentBtn = document.getElementById("btn-talents");
+  if (talentBtn) {
+    talentBtn.onclick = () => showTalentTree(m.uid);
   }
 }
 
@@ -1885,7 +2150,16 @@ async function resolveTurn(pAct, aiAct) {
     battle.pIndex = pAct.index;
     const pm = document.getElementById("player-mon");
     if (pm) { pm.classList.remove("switch-in"); void pm.offsetWidth; pm.classList.add("switch-in"); }
-    logLines.push(`You send out <b>${activePlayer().name}</b>!`);
+    const switchedP = activePlayer();
+    logLines.push(`You send out <b>${switchedP.name}</b>!`);
+    
+    // Tide Healer perk: heal 8% HP on switch-in
+    if (switchedP.uid && typeof hasTalentPerk === "function" && hasTalentPerk(switchedP.uid, "tide")) {
+      const healAmt = Math.max(1, Math.floor(switchedP.baseHp * 0.08));
+      switchedP.hp = Math.min(switchedP.baseHp, switchedP.hp + healAmt);
+      logLines.push(`🌊 Tide Healer restores <b>${healAmt}</b> HP to ${switchedP.name}!`);
+    }
+    
     pActs = false;
     updateLog();
     await delay(1000);
@@ -2166,7 +2440,17 @@ function forcedSwitchTo(i) {
   const pm = document.getElementById("player-mon");
   if (pm) { pm.classList.remove("switch-in"); void pm.offsetWidth; pm.classList.add("switch-in"); }
   renderBattle(true);
-  document.getElementById("battle-log").innerHTML = `You send out <b>${activePlayer().name}</b>!`;
+  const p = activePlayer();
+  document.getElementById("battle-log").innerHTML = `You send out <b>${p.name}</b>!`;
+  
+  // Tide Healer perk: heal 8% HP on switch-in
+  if (p.uid && typeof hasTalentPerk === "function" && hasTalentPerk(p.uid, "tide")) {
+    const healAmt = Math.max(1, Math.floor(p.baseHp * 0.08));
+    p.hp = Math.min(p.baseHp, p.hp + healAmt);
+    document.getElementById("battle-log").innerHTML += `<br>🌊 Tide Healer restores <b>${healAmt}</b> HP to ${p.name}!`;
+    renderBattle(false);
+  }
+  
   awaitingInput = true;
   buildActionPanel();
 }
@@ -2248,6 +2532,7 @@ function endBattle(won) {
 
   save.vp = Math.max(0, save.vp + vpChange);
   if (won) trackQuest("win_battles", 1);
+  if (won) awardAllMasteryPoints(1);
   trackQuest("earn_gold", goldReward);
   save.gold += goldReward;
   save.playerXp += xpReward;
@@ -2523,10 +2808,11 @@ function claimAchievement(id) {
   save.achievements.push(id);
   save.gold += ach.reward.gold;
   save.gems += ach.reward.gems;
+  awardAllMasteryPoints(2);
   saveGame();
   refreshHome();
   refreshAchievementsUI();
-  showModal({ icon: "🏆", title: `Achievement Unlocked: ${ach.name}`, message: `Claimed ${ach.reward.gold} 🪙 and ${ach.reward.gems} 💎!` });
+  showModal({ icon: "🏆", title: `Achievement Unlocked: ${ach.name}`, message: `Claimed ${ach.reward.gold} 🪙 and ${ach.reward.gems} 💎! +2 MP to all creatures!` });
 }
 
 function refreshAchievementsUI() {
