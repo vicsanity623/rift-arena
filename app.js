@@ -1797,6 +1797,14 @@ function startTourneyMatch(matchIdx) {
     return;
   }
 
+  // Reset battle state for next tournament match
+  awaitingInput = true;
+  setWeather("none", 0);
+  const apEl = document.getElementById("action-panel");
+  if (apEl) apEl.innerHTML = "";
+  const blEl = document.getElementById("battle-log");
+  if (blEl) blEl.textContent = "";
+
   const pData = playerUids.map(uid => {
     const m = getMonData(uid);
     m.effDef = Math.round(m.def * (m.item === "ironscale" ? 1.15 : 1));
