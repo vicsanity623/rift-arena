@@ -328,15 +328,21 @@ function initDojoUI() {
     });
     selectHtml += `</select>`;
 
+    const guildMults = typeof getGuildRewardMultipliers === "function" ? getGuildRewardMultipliers() : { training: 1 };
     let trainingHtml = `<div class="dojo-options">`;
     Object.keys(DOJO_TRAININGS).forEach(key => {
       const t = DOJO_TRAININGS[key];
+      const trainingMult = guildMults.training || 1;
+      const adjustedDur = Math.round(t.durMs * trainingMult);
+      const adjustedDesc = trainingMult < 1
+        ? `${Math.ceil(adjustedDur / 60000)} min · ${t.desc.split("·")[1] || t.xpMult + "x XP"}`
+        : t.desc;
       trainingHtml += `
         <label class="dojo-option" data-key="${key}">
           <input type="radio" name="dojo-type" value="${key}" ${key === "light" ? "checked" : ""}>
           <div class="dojo-option-content">
             <div class="dojo-option-name">${t.name}</div>
-            <div class="dojo-option-desc">${t.desc}</div>
+            <div class="dojo-option-desc">${adjustedDesc}</div>
             <div class="dojo-option-cost">${t.goldCost > 0 ? `🪙 ${t.goldCost}` : "Free"}</div>
           </div>
         </label>
@@ -374,11 +380,14 @@ function initDojoUI() {
       const monState = save.mons.find(m => m.uid === uid);
       monState.onExpedition = true; // reuse expedition flag to block battle
 
+      const guildMults = typeof getGuildRewardMultipliers === "function" ? getGuildRewardMultipliers() : { training: 1 };
+      const adjustedDur = Math.round(training.durMs * (guildMults.training || 1));
+
       save.dojo = {
         active: true,
         uid: uid,
         type: type,
-        endTime: Date.now() + training.durMs
+        endTime: Date.now() + adjustedDur
       };
       saveGame();
       initDojoUI();
@@ -389,9 +398,10 @@ function initDojoUI() {
 function claimDojo() {
   const mSave = save.mons.find(m => m.uid === save.dojo.uid);
   const training = DOJO_TRAININGS[save.dojo.type];
+  const guildMults = typeof getGuildRewardMultipliers === "function" ? getGuildRewardMultipliers() : { gold: 1, xp: 1 };
 
-  const xpGained = training.xpMult * 75;
-  const goldGained = training.xpMult * 5;
+  const xpGained = Math.round(training.xpMult * 75 * guildMults.xp);
+  const goldGained = Math.round(training.xpMult * 5 * guildMults.gold);
 
   mSave.xp += xpGained;
   mSave.onExpedition = false;
@@ -1021,6 +1031,9 @@ function initShopUI() {
   container.innerHTML = "";
 
   const stock = getShopStock();
+  const guildMults = typeof getGuildRewardMultipliers === "function" ? getGuildRewardMultipliers() : { shop: 1 };
+  const shopMult = guildMults.shop || 1;
+  const hasDiscount = shopMult < 1;
 
   // Free daily item
   const freeCard = document.createElement("div");
@@ -1053,6 +1066,8 @@ function initShopUI() {
 
   // Shop items
   stock.items.forEach((item, idx) => {
+    const discountedGold = item.priceGold > 0 ? Math.round(item.priceGold * shopMult) : 0;
+    const discountedGems = item.priceGems > 0 ? Math.round(item.priceGems * shopMult) : 0;
     const card = document.createElement("div");
     card.className = "details-card";
     card.innerHTML = `
@@ -1061,7 +1076,9 @@ function initShopUI() {
           <div style="font-weight:bold; font-size:14px;">${item.icon} ${item.name}</div>
           <div style="font-size:11px; color:var(--text-dim);">${item.desc}</div>
           <div style="font-size:11px; color:var(--gold-dim); margin-top:4px;">
-            ${item.priceGold > 0 ? `🪙 ${item.priceGold}` : ""} ${item.priceGems > 0 ? `💎 ${item.priceGems}` : ""}
+            ${hasDiscount && item.priceGold > 0 ? `<span style="text-decoration:line-through;opacity:0.5;">🪙 ${item.priceGold}</span> ` : ""}
+            ${discountedGold > 0 ? `🪙 ${discountedGold}` : ""} ${discountedGems > 0 ? `💎 ${discountedGems}` : ""}
+            ${hasDiscount ? `<span style="color:var(--safe);font-size:10px;">(-${Math.round((1-shopMult)*100)}%)</span>` : ""}
             <span style="margin-left:8px; color:var(--text-dim);">Stock: ${item.stock}</span>
           </div>
         </div>
@@ -1084,17 +1101,22 @@ function purchaseShopItem(idx) {
   const item = stock.items[idx];
   if (!item || item.stock <= 0) return;
 
+  const guildMults = typeof getGuildRewardMultipliers === "function" ? getGuildRewardMultipliers() : { shop: 1 };
+  const shopMult = guildMults.shop || 1;
+  const effectiveGold = item.priceGold > 0 ? Math.round(item.priceGold * shopMult) : 0;
+  const effectiveGems = item.priceGems > 0 ? Math.round(item.priceGems * shopMult) : 0;
+
   if (item.key === "gems_pack") {
-    if (save.gold < item.priceGold) return showModal({ icon: "🪙", title: "Not Enough Gold", message: "Not enough gold!" });
-    save.gold -= item.priceGold;
+    if (save.gold < effectiveGold) return showModal({ icon: "🪙", title: "Not Enough Gold", message: "Not enough gold!" });
+    save.gold -= effectiveGold;
     save.gems += 50;
   } else if (item.key === "stamina_refill") {
-    if (save.gems < item.priceGems) return showModal({ icon: "💎", title: "Not Enough Gems", message: "Not enough gems!" });
-    save.gems -= item.priceGems;
+    if (save.gems < effectiveGems) return showModal({ icon: "💎", title: "Not Enough Gems", message: "Not enough gems!" });
+    save.gems -= effectiveGems;
     if (typeof refillStamina === "function") refillStamina(50);
   } else {
-    if (save.gold < item.priceGold) return showModal({ icon: "🪙", title: "Not Enough Gold", message: "Not enough gold!" });
-    save.gold -= item.priceGold;
+    if (save.gold < effectiveGold) return showModal({ icon: "🪙", title: "Not Enough Gold", message: "Not enough gold!" });
+    save.gold -= effectiveGold;
     save.bag[item.key] = (save.bag[item.key] || 0) + 1;
   }
 
