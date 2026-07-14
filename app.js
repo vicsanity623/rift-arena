@@ -844,6 +844,7 @@ function generateDefaultSave() {
     vp: 1000, wins: 0, losses: 0,
     playerLevel: 1, playerXp: 0, gold: 500, gems: 100,
     tierLevel: 1, tierXp: 0,
+    stamina: 100, staminaMax: 100, lastStaminaRegen: Date.now(),
     lastIdleClaim: Date.now(),
     explore: { active: false },
     dojo: { active: false },
@@ -884,6 +885,9 @@ let save = (function () {
   });
   if (!s.matchHistory) s.matchHistory = [];
   if (!s.shopStock) s.shopStock = null;
+  if (s.stamina === undefined) s.stamina = 100;
+  if (s.staminaMax === undefined) s.staminaMax = 100;
+  if (s.lastStaminaRegen === undefined) s.lastStaminaRegen = Date.now();
   if (!s.dailyLogin) s.dailyLogin = { date: "", streak: 0, claimed: false };
   if (!s.guild) s.guild = null;
   if (!s.achievements) s.achievements = [];
@@ -892,6 +896,61 @@ let save = (function () {
   return s;
 })();
 function saveGame() { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); }
+
+// --- STAMINA SYSTEM ---
+const STAMINA_COST = { battle: 10, survival: 15, tournament: 20, explore: 5, dojo: 5, dungeon: 15 };
+const STAMINA_REGEN_MS = 5 * 60 * 1000; // 1 per 5 minutes
+
+function ensureStaminaRegen() {
+  if (save.stamina >= save.staminaMax) {
+    save.lastStaminaRegen = Date.now();
+    return;
+  }
+  const elapsed = Date.now() - save.lastStaminaRegen;
+  const regened = Math.floor(elapsed / STAMINA_REGEN_MS);
+  if (regened > 0) {
+    save.stamina = Math.min(save.staminaMax, save.stamina + regened);
+    save.lastStaminaRegen += regened * STAMINA_REGEN_MS;
+    saveGame();
+  }
+}
+
+function getNextStaminaRegen() {
+  if (save.stamina >= save.staminaMax) return 0;
+  const elapsed = Date.now() - save.lastStaminaRegen;
+  const remaining = STAMINA_REGEN_MS - (elapsed % STAMINA_REGEN_MS);
+  return Math.max(0, remaining);
+}
+
+function formatStaminaRegen(ms) {
+  if (ms <= 0) return "Full";
+  const mins = Math.ceil(ms / 60000);
+  const secs = Math.ceil((ms % 60000) / 1000);
+  return `${mins}:${String(secs).padStart(2, "0")}`;
+}
+
+function hasStamina(cost) {
+  ensureStaminaRegen();
+  return save.stamina >= cost;
+}
+
+function deductStamina(cost) {
+  if (!hasStamina(cost)) return false;
+  save.stamina -= cost;
+  saveGame();
+  return true;
+}
+
+function refundStamina(cost) {
+  save.stamina = Math.min(save.staminaMax, save.stamina + cost);
+  saveGame();
+}
+
+function refillStamina(amount) {
+  save.stamina = Math.min(save.staminaMax, save.stamina + amount);
+  save.lastStaminaRegen = Date.now();
+  saveGame();
+}
 
 function getPlayerMaxXp(lvl) { return lvl * 150; }
 function getMonMaxXp(lvl) { return lvl * lvl * 50; }
@@ -1061,6 +1120,17 @@ function refreshHome() {
 
   document.getElementById("home-rank").textContent = rankForVP(save.vp);
   document.getElementById("home-vp").textContent = formatNum(save.vp) + " VP";
+
+  ensureStaminaRegen();
+  const stEl = document.getElementById("stamina-count");
+  const fillEl = document.getElementById("stamina-fill");
+  const regenEl = document.getElementById("stamina-regen");
+  if (stEl) stEl.textContent = `${save.stamina}/${save.staminaMax}`;
+  if (fillEl) fillEl.style.width = `${(save.stamina / save.staminaMax) * 100}%`;
+  if (regenEl) {
+    const nextMs = getNextStaminaRegen();
+    regenEl.textContent = nextMs > 0 ? `+1 in ${formatStaminaRegen(nextMs)}` : "Full";
+  }
   if (typeof updateExploreDash === "function") updateExploreDash();
   if (typeof updateDojoDash === "function") updateDojoDash();
   if (typeof updateTourneyDashboard === "function") updateTourneyDashboard();
@@ -1081,6 +1151,22 @@ setInterval(() => {
   const earned = mins * 3;
   document.getElementById("idle-status").textContent = mins > 0 ? `${formatNum(earned)}🪙 stored` : "Claim";
 }, 1000);
+
+setInterval(() => {
+  const homeActive = document.getElementById("screen-home").classList.contains("active");
+  if (homeActive) {
+    ensureStaminaRegen();
+    const fillEl = document.getElementById("stamina-fill");
+    const stEl = document.getElementById("stamina-count");
+    const regenEl = document.getElementById("stamina-regen");
+    if (fillEl) fillEl.style.width = `${(save.stamina / save.staminaMax) * 100}%`;
+    if (stEl) stEl.textContent = `${save.stamina}/${save.staminaMax}`;
+    if (regenEl) {
+      const nextMs = getNextStaminaRegen();
+      regenEl.textContent = nextMs > 0 ? `+1 in ${formatStaminaRegen(nextMs)}` : "Full";
+    }
+  }
+}, 5000);
 
 document.getElementById("card-idle").addEventListener("click", () => {
   const diff = Date.now() - save.lastIdleClaim;
@@ -1551,6 +1637,9 @@ let matchmakingTimer = null;
 let matchmakingCancelled = false;
 
 function startMatchmaking(playerUids) {
+  if (!deductStamina(STAMINA_COST.battle)) {
+    return showModal({ icon: "⚡", title: "Not Enough Stamina", message: `Need ${STAMINA_COST.battle} stamina to queue for battle. Regen: 1 per 5 min.` });
+  }
   const pData = playerUids.map(uid => getMonData(uid));
   const avgLevel = Math.max(1, Math.floor(pData.reduce((s, m) => s + m.level, 0) / 3));
   const playerVP = save.vp;
@@ -1633,6 +1722,7 @@ function startMatchmaking(playerUids) {
 function cancelMatchmaking() {
   matchmakingCancelled = true;
   clearInterval(matchmakingTimer);
+  refundStamina(STAMINA_COST.battle);
   buildSelectGrid();
   show("screen-select");
 }
@@ -1653,6 +1743,9 @@ var tournamentState = null;
 function startTournamentMode(playerUids) {
   const entryFee = 50;
   if (save.gems < entryFee) return showModal({ icon: "🏆", title: "Entry Fee", message: `Tournament entry requires ${entryFee} Gems. You have ${save.gems}.` });
+  if (!deductStamina(STAMINA_COST.tournament)) {
+    return showModal({ icon: "⚡", title: "Not Enough Stamina", message: `Need ${STAMINA_COST.tournament} stamina for Tournament. Regen: 1 per 5 min.` });
+  }
 
   const pData = playerUids.map(uid => getMonData(uid));
   const avgLevel = Math.max(1, Math.floor(pData.reduce((s, m) => s + m.level, 0) / 3));

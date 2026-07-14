@@ -365,6 +365,11 @@ function initDojoUI() {
 
       if (save.gold < training.goldCost) return showModal({ icon: "🪙", title: "Not Enough Gold", message: `Not enough gold. Need ${training.goldCost} 🪙.` });
 
+      const staminaCost = type === "light" ? STAMINA_COST.dojo : type === "medium" ? STAMINA_COST.dojo * 2 : STAMINA_COST.dojo * 3;
+      if (typeof deductStamina !== "function" || !deductStamina(staminaCost)) {
+        return showModal({ icon: "⚡", title: "Not Enough Stamina", message: `Need ${staminaCost} stamina for ${training.name}. Regen: 1 per 5 min.` });
+      }
+
       save.gold -= training.goldCost;
       const monState = save.mons.find(m => m.uid === uid);
       monState.onExpedition = true; // reuse expedition flag to block battle
@@ -409,6 +414,9 @@ function claimDojo() {
 let survivalState = null;
 
 function startSurvivalMode() {
+  if (typeof deductStamina !== "function" || !deductStamina(STAMINA_COST.survival)) {
+    return showModal({ icon: "⚡", title: "Not Enough Stamina", message: `Need ${STAMINA_COST.survival} stamina for Survival mode. Regen: 1 per 5 min.` });
+  }
   awaitingInput = true;
   setWeather("none", 0);
   const el = document.getElementById("action-panel");
@@ -604,6 +612,7 @@ function showSurvivalWaveEndUI(waveRewards) {
 function survivalLost() {
   survivalState.over = true;
   const survived = survivalState.wave - 1;
+  if (typeof refundStamina === "function") refundStamina(Math.floor(STAMINA_COST.survival / 2));
   showModal({ icon: "💀", title: `Defeated at Wave ${survivalState.wave}`, message: `You earned ${formatNum(survivalState.rewards.gold)} Gold, ${formatNum(survivalState.rewards.gems)} Gems over ${survived} waves.` });
   survivalState = null;
   pickOrder = [];
@@ -613,6 +622,7 @@ function survivalLost() {
 
 function survivalComplete() {
   const waves = survivalState.wave - 1;
+  if (typeof refundStamina === "function") refundStamina(Math.floor(STAMINA_COST.survival / 2));
   showModal({ icon: "🏆", title: "Survival Complete!", message: `Cleared ${waves} waves.<br><br>Final Rewards: 🪙${formatNum(survivalState.rewards.gold)} 💎${formatNum(survivalState.rewards.gems)}` });
   playVictorySound();
   survivalState = null;
@@ -708,6 +718,10 @@ function initExploreUI() {
     document.getElementById("btn-start-explore").onclick = () => {
       const uid = document.getElementById("explore-mon-select").value;
       const mins = parseInt(document.getElementById("explore-time-select").value);
+      const staminaCost = mins <= 2 ? STAMINA_COST.explore : mins <= 30 ? STAMINA_COST.explore * 2 : STAMINA_COST.explore * 3;
+      if (typeof deductStamina !== "function" || !deductStamina(staminaCost)) {
+        return showModal({ icon: "⚡", title: "Not Enough Stamina", message: `Need ${staminaCost} stamina for expedition. Regen: 1 per 5 min.` });
+      }
       const monState = save.mons.find(m => m.uid === uid);
       
       monState.onExpedition = true;
@@ -975,6 +989,7 @@ const SHOP_ITEMS = [
   { key:"puredew", name:"Pure Dew", desc:"Cures status when HP<30%", priceGold:300, priceGems:0, icon:"💧" },
   { key:"steadfastsash", name:"Steadfast Sash", desc:"Survives lethal hit once", priceGold:400, priceGems:0, icon:"🧣" },
   { key:"gems_pack", name:"Gem Pack (50💎)", desc:"50 gems for gold", priceGold:500, priceGems:0, icon:"💎" },
+  { key:"stamina_refill", name:"Stamina Refill", desc:"+50 Stamina", priceGold:0, priceGems:50, icon:"⚡" },
 ];
 
 const SHOP_REFRESH_KEY = "rift_shop_refresh";
@@ -1068,6 +1083,10 @@ function purchaseShopItem(idx) {
     if (save.gold < item.priceGold) return showModal({ icon: "🪙", title: "Not Enough Gold", message: "Not enough gold!" });
     save.gold -= item.priceGold;
     save.gems += 50;
+  } else if (item.key === "stamina_refill") {
+    if (save.gems < item.priceGems) return showModal({ icon: "💎", title: "Not Enough Gems", message: "Not enough gems!" });
+    save.gems -= item.priceGems;
+    if (typeof refillStamina === "function") refillStamina(50);
   } else {
     if (save.gold < item.priceGold) return showModal({ icon: "🪙", title: "Not Enough Gold", message: "Not enough gold!" });
     save.gold -= item.priceGold;
@@ -1876,6 +1895,10 @@ function startDungeon(teamUids, dungeonIdx) {
   const dd = DUNGEON_DEFS[dungeonIdx];
   if (!dd) return;
 
+  if (typeof deductStamina !== "function" || !deductStamina(STAMINA_COST.dungeon)) {
+    return showModal({ icon: "⚡", title: "Not Enough Stamina", message: `Need ${STAMINA_COST.dungeon} stamina to enter ${dd.name}. Regen: 1 per 5 min.` });
+  }
+
   const pData = teamUids.map(uid => getMonData(uid));
   dungeonState = {
     active: true,
@@ -2125,6 +2148,7 @@ function showDungeonFloorEndUI(floor, dd, lootInfo, isBoss) {
 
 function dungeonRetreat() {
   if (!dungeonState) return;
+  if (typeof refundStamina === "function") refundStamina(Math.floor(STAMINA_COST.dungeon / 2));
   const rewards = dungeonState.totalRewards;
   const dd = DUNGEON_DEFS[dungeonState.dungeonIdx];
   const floorsCleared = dungeonState.currentFloor - 1;
