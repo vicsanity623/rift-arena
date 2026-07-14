@@ -1157,7 +1157,7 @@ function refreshHome() {
   if (fillEl) fillEl.style.width = `${(save.stamina / save.staminaMax) * 100}%`;
   if (regenEl) {
     const nextMs = getNextStaminaRegen();
-    regenEl.textContent = nextMs > 0 ? `+1 in ${formatStaminaRegen(nextMs)}` : "Full";
+    regenEl.textContent = nextMs > 0 ? `+10 in ${formatStaminaRegen(nextMs)}` : "Full";
   }
   if (typeof updateExploreDash === "function") updateExploreDash();
   if (typeof updateDojoDash === "function") updateDojoDash();
@@ -1191,7 +1191,7 @@ setInterval(() => {
     if (stEl) stEl.textContent = `${save.stamina}/${save.staminaMax}`;
     if (regenEl) {
       const nextMs = getNextStaminaRegen();
-      regenEl.textContent = nextMs > 0 ? `+1 in ${formatStaminaRegen(nextMs)}` : "Full";
+      regenEl.textContent = nextMs > 0 ? `+10 in ${formatStaminaRegen(nextMs)}` : "Full";
     }
   }
 }, 5000);
