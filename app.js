@@ -21,7 +21,6 @@ const BATTLE_ITEMS = {
   def_boost: { name: "DEF Booster", desc: "+30% DEF for one battle", icon: "🛡️", tier: "uncommon", slot: "consumable", statBonus: {} },
   spd_boost: { name: "SPD Booster", desc: "+30% SPD for one battle", icon: "💨", tier: "uncommon", slot: "consumable", statBonus: {} },
 };
-Object.assign(ITEMS, BATTLE_ITEMS);
 
 const ITEMS = {
   none: { name: "None", desc: "No item held.", tier: "common", slot: "any", statBonus: {} },
@@ -53,6 +52,8 @@ const ITEMS = {
   aegis_shield: { name: "Aegis Shield", desc: "+20% DEF, +10% HP", tier: "epic", slot: "armor", statBonus: { def: 0.20, hp: 0.10 } },
   phoenix_crown: { name: "Phoenix Crown", desc: "+30% All Stats", tier: "legendary", slot: "armor", statBonus: { hp: 0.30, atk: 0.30, def: 0.30, spd: 0.30 } }
 };
+
+Object.assign(ITEMS, BATTLE_ITEMS);
 
 const CRAFTING_RECIPES = [
   { id: "leather_bracers", name: "Leather Bracers", goldCost: 100, materials: [{ key: "leather", qty: 2 }, { key: "cloth", qty: 1 }] },
@@ -94,61 +95,61 @@ const TALENT_TREES = {
   ember: {
     name: "Ember", icon: "🔥", color: "#ff6a45",
     nodes: [
-      { id: "ember_hp",   name: "Ember Vitality",   icon: "❤️",   desc: "+10% HP",        stat: "hp",  bonus: 0.10, cost: 2, req: null },
-      { id: "ember_atk",  name: "Ember Strength",   icon: "⚔️",   desc: "+10% ATK",       stat: "atk", bonus: 0.10, cost: 2, req: null },
-      { id: "ember_def",  name: "Ember Shell",      icon: "🛡️",   desc: "+10% DEF",       stat: "def", bonus: 0.10, cost: 2, req: null },
-      { id: "ember_spd",  name: "Ember Swift",      icon: "💨",   desc: "+10% SPD",       stat: "spd", bonus: 0.10, cost: 2, req: null },
-      { id: "ember_inferno", name: "Inferno",       icon: "🌋",   desc: "+15% burn chance on attacks", perk: "inferno", cost: 4, req: ["ember_atk"] }
+      { id: "ember_hp", name: "Ember Vitality", icon: "❤️", desc: "+10% HP", stat: "hp", bonus: 0.10, cost: 2, req: null },
+      { id: "ember_atk", name: "Ember Strength", icon: "⚔️", desc: "+10% ATK", stat: "atk", bonus: 0.10, cost: 2, req: null },
+      { id: "ember_def", name: "Ember Shell", icon: "🛡️", desc: "+10% DEF", stat: "def", bonus: 0.10, cost: 2, req: null },
+      { id: "ember_spd", name: "Ember Swift", icon: "💨", desc: "+10% SPD", stat: "spd", bonus: 0.10, cost: 2, req: null },
+      { id: "ember_inferno", name: "Inferno", icon: "🌋", desc: "+15% burn chance on attacks", perk: "inferno", cost: 4, req: ["ember_atk"] }
     ]
   },
   aqua: {
     name: "Aqua", icon: "🌊", color: "#33c7ea",
     nodes: [
-      { id: "aqua_hp",   name: "Aqua Vitality",   icon: "❤️",   desc: "+10% HP",      stat: "hp",  bonus: 0.10, cost: 2, req: null },
-      { id: "aqua_atk",  name: "Aqua Strength",   icon: "⚔️",   desc: "+10% ATK",     stat: "atk", bonus: 0.10, cost: 2, req: null },
-      { id: "aqua_def",  name: "Aqua Shell",      icon: "🛡️",   desc: "+10% DEF",     stat: "def", bonus: 0.10, cost: 2, req: null },
-      { id: "aqua_spd",  name: "Aqua Swift",      icon: "💨",   desc: "+10% SPD",     stat: "spd", bonus: 0.10, cost: 2, req: null },
-      { id: "aqua_tide", name: "Tide Healer",     icon: "💧",   desc: "Heal 8% HP on switch-in", perk: "tide", cost: 4, req: ["aqua_hp"] }
+      { id: "aqua_hp", name: "Aqua Vitality", icon: "❤️", desc: "+10% HP", stat: "hp", bonus: 0.10, cost: 2, req: null },
+      { id: "aqua_atk", name: "Aqua Strength", icon: "⚔️", desc: "+10% ATK", stat: "atk", bonus: 0.10, cost: 2, req: null },
+      { id: "aqua_def", name: "Aqua Shell", icon: "🛡️", desc: "+10% DEF", stat: "def", bonus: 0.10, cost: 2, req: null },
+      { id: "aqua_spd", name: "Aqua Swift", icon: "💨", desc: "+10% SPD", stat: "spd", bonus: 0.10, cost: 2, req: null },
+      { id: "aqua_tide", name: "Tide Healer", icon: "💧", desc: "Heal 8% HP on switch-in", perk: "tide", cost: 4, req: ["aqua_hp"] }
     ]
   },
   verdant: {
     name: "Verdant", icon: "🌿", color: "#5fd66b",
     nodes: [
-      { id: "verdant_hp",   name: "Verdant Vitality", icon: "❤️",   desc: "+10% HP",         stat: "hp",  bonus: 0.10, cost: 2, req: null },
-      { id: "verdant_atk",  name: "Verdant Strength", icon: "⚔️",   desc: "+10% ATK",        stat: "atk", bonus: 0.10, cost: 2, req: null },
-      { id: "verdant_def",  name: "Verdant Shell",    icon: "🛡️",   desc: "+10% DEF",        stat: "def", bonus: 0.10, cost: 2, req: null },
-      { id: "verdant_spd",  name: "Verdant Swift",    icon: "💨",   desc: "+10% SPD",        stat: "spd", bonus: 0.10, cost: 2, req: null },
-      { id: "verdant_thorn", name: "Thornmail",       icon: "🌵",   desc: "+15% thorns reflect", perk: "thornmail", cost: 4, req: ["verdant_def"] }
+      { id: "verdant_hp", name: "Verdant Vitality", icon: "❤️", desc: "+10% HP", stat: "hp", bonus: 0.10, cost: 2, req: null },
+      { id: "verdant_atk", name: "Verdant Strength", icon: "⚔️", desc: "+10% ATK", stat: "atk", bonus: 0.10, cost: 2, req: null },
+      { id: "verdant_def", name: "Verdant Shell", icon: "🛡️", desc: "+10% DEF", stat: "def", bonus: 0.10, cost: 2, req: null },
+      { id: "verdant_spd", name: "Verdant Swift", icon: "💨", desc: "+10% SPD", stat: "spd", bonus: 0.10, cost: 2, req: null },
+      { id: "verdant_thorn", name: "Thornmail", icon: "🌵", desc: "+15% thorns reflect", perk: "thornmail", cost: 4, req: ["verdant_def"] }
     ]
   },
   volt: {
     name: "Volt", icon: "⚡", color: "#f4d33c",
     nodes: [
-      { id: "volt_hp",   name: "Volt Vitality",   icon: "❤️",   desc: "+10% HP",       stat: "hp",  bonus: 0.10, cost: 2, req: null },
-      { id: "volt_atk",  name: "Volt Strength",   icon: "⚔️",   desc: "+10% ATK",      stat: "atk", bonus: 0.10, cost: 2, req: null },
-      { id: "volt_def",  name: "Volt Shell",      icon: "🛡️",   desc: "+10% DEF",      stat: "def", bonus: 0.10, cost: 2, req: null },
-      { id: "volt_spd",  name: "Volt Swift",      icon: "💨",   desc: "+10% SPD",      stat: "spd", bonus: 0.10, cost: 2, req: null },
-      { id: "volt_overcharge", name: "Overcharge", icon: "🔋",   desc: "+20% Static speed bonus", perk: "overcharge", cost: 4, req: ["volt_spd"] }
+      { id: "volt_hp", name: "Volt Vitality", icon: "❤️", desc: "+10% HP", stat: "hp", bonus: 0.10, cost: 2, req: null },
+      { id: "volt_atk", name: "Volt Strength", icon: "⚔️", desc: "+10% ATK", stat: "atk", bonus: 0.10, cost: 2, req: null },
+      { id: "volt_def", name: "Volt Shell", icon: "🛡️", desc: "+10% DEF", stat: "def", bonus: 0.10, cost: 2, req: null },
+      { id: "volt_spd", name: "Volt Swift", icon: "💨", desc: "+10% SPD", stat: "spd", bonus: 0.10, cost: 2, req: null },
+      { id: "volt_overcharge", name: "Overcharge", icon: "🔋", desc: "+20% Static speed bonus", perk: "overcharge", cost: 4, req: ["volt_spd"] }
     ]
   },
   stone: {
     name: "Stone", icon: "🪨", color: "#c98a52",
     nodes: [
-      { id: "stone_hp",   name: "Stone Vitality",   icon: "❤️",   desc: "+10% HP",        stat: "hp",  bonus: 0.10, cost: 2, req: null },
-      { id: "stone_atk",  name: "Stone Strength",   icon: "⚔️",   desc: "+10% ATK",       stat: "atk", bonus: 0.10, cost: 2, req: null },
-      { id: "stone_def",  name: "Stone Shell",      icon: "🛡️",   desc: "+10% DEF",       stat: "def", bonus: 0.10, cost: 2, req: null },
-      { id: "stone_spd",  name: "Stone Swift",      icon: "💨",   desc: "+10% SPD",       stat: "spd", bonus: 0.10, cost: 2, req: null },
-      { id: "stone_fortress", name: "Fortress",     icon: "🏰",   desc: "+15% Fortify defense boost", perk: "fortress", cost: 4, req: ["stone_def"] }
+      { id: "stone_hp", name: "Stone Vitality", icon: "❤️", desc: "+10% HP", stat: "hp", bonus: 0.10, cost: 2, req: null },
+      { id: "stone_atk", name: "Stone Strength", icon: "⚔️", desc: "+10% ATK", stat: "atk", bonus: 0.10, cost: 2, req: null },
+      { id: "stone_def", name: "Stone Shell", icon: "🛡️", desc: "+10% DEF", stat: "def", bonus: 0.10, cost: 2, req: null },
+      { id: "stone_spd", name: "Stone Swift", icon: "💨", desc: "+10% SPD", stat: "spd", bonus: 0.10, cost: 2, req: null },
+      { id: "stone_fortress", name: "Fortress", icon: "🏰", desc: "+15% Fortify defense boost", perk: "fortress", cost: 4, req: ["stone_def"] }
     ]
   },
   gale: {
     name: "Gale", icon: "💨", color: "#9db4ff",
     nodes: [
-      { id: "gale_hp",   name: "Gale Vitality",   icon: "❤️",   desc: "+10% HP",       stat: "hp",  bonus: 0.10, cost: 2, req: null },
-      { id: "gale_atk",  name: "Gale Strength",   icon: "⚔️",   desc: "+10% ATK",      stat: "atk", bonus: 0.10, cost: 2, req: null },
-      { id: "gale_def",  name: "Gale Shell",      icon: "🛡️",   desc: "+10% DEF",      stat: "def", bonus: 0.10, cost: 2, req: null },
-      { id: "gale_spd",  name: "Gale Swift",      icon: "💨",   desc: "+10% SPD",      stat: "spd", bonus: 0.10, cost: 2, req: null },
-      { id: "gale_phantom", name: "Phantom Step", icon: "👻",   desc: "+15% Evasion dodge chance", perk: "phantom", cost: 4, req: ["gale_spd"] }
+      { id: "gale_hp", name: "Gale Vitality", icon: "❤️", desc: "+10% HP", stat: "hp", bonus: 0.10, cost: 2, req: null },
+      { id: "gale_atk", name: "Gale Strength", icon: "⚔️", desc: "+10% ATK", stat: "atk", bonus: 0.10, cost: 2, req: null },
+      { id: "gale_def", name: "Gale Shell", icon: "🛡️", desc: "+10% DEF", stat: "def", bonus: 0.10, cost: 2, req: null },
+      { id: "gale_spd", name: "Gale Swift", icon: "💨", desc: "+10% SPD", stat: "spd", bonus: 0.10, cost: 2, req: null },
+      { id: "gale_phantom", name: "Phantom Step", icon: "👻", desc: "+15% Evasion dodge chance", perk: "phantom", cost: 4, req: ["gale_spd"] }
     ]
   }
 };
@@ -407,24 +408,36 @@ const TYPE_CHART = {
 function typeMultiplier(atkType, defType) { return (atkType === "neutral") ? 1 : ((TYPE_CHART[atkType] && TYPE_CHART[atkType][defType]) || 1); }
 
 const PASSIVE_ABILITIES = {
-  ember: { name:"Blaze", icon:"🔥", desc:"15% chance to burn attackers when hit", 
+  ember: {
+    name: "Blaze", icon: "🔥", desc: "15% chance to burn attackers when hit",
     onHit(owner, attacker) { const hasPerk = typeof hasTalentPerk === "function" && owner.uid && hasTalentPerk(owner.uid, "inferno"); const chance = hasPerk ? 0.30 : 0.15; if (Math.random() < chance && !owner.fainted) { applyStatus(attacker, "burn"); return true; } return false; },
-    getEvoDesc:(lvl)=>`${Math.min(35, 15 + Math.floor(lvl/3))}% chance to burn attackers` },
-  aqua: { name:"Tide", icon:"🌊", desc:"Heal 5% max HP at start of each turn",
-    onTurnStart(owner) { if (!owner.fainted && owner.hp < owner.baseHp) { const pct = 0.05 + (owner.level||1) * 0.002; const amt = Math.max(1, Math.floor(owner.baseHp * Math.min(0.12, pct))); owner.hp = Math.min(owner.baseHp, owner.hp + amt); return amt; } return 0; },
-    getEvoDesc:(lvl)=>`Heal ${Math.min(12, 5 + Math.floor(lvl/2))}% max HP each turn` },
-  verdant: { name:"Thorns", icon:"🌿", desc:"Reflect 20% of damage back to attacker",
-    onHit(owner, attacker) { if (!owner.fainted && !attacker.fainted) { const hasPerk = typeof hasTalentPerk === "function" && owner.uid && hasTalentPerk(owner.uid, "thornmail"); const baseReflect = hasPerk ? 0.35 : 0.20; const reflectPct = baseReflect + (owner.level||1) * 0.003; const reflect = Math.max(1, Math.floor(owner._lastDmg * Math.min(0.5, reflectPct))); attacker.hp = Math.max(0, attacker.hp - reflect); return reflect; } return 0; },
-    getEvoDesc:(lvl)=>`Reflect ${Math.min(40, 20 + Math.floor(lvl/2))}% damage back` },
-  volt: { name:"Static", icon:"⚡", desc:"+15% Speed in battle", 
-    onInit(owner) { const hasPerk = typeof hasTalentPerk === "function" && owner.uid && hasTalentPerk(owner.uid, "overcharge"); const baseBoost = hasPerk ? 1.35 : 1.15; const boost = baseBoost + (owner.level||1) * 0.003; owner.spd = Math.floor(owner._baseSpd * Math.min(1.55, boost)); },
-    getEvoDesc:(lvl)=>`+${Math.min(35, 15 + Math.floor(lvl/2))}% Speed in battle` },
-  stone: { name:"Fortify", icon:"🪨", desc:"+15% Defense in battle",
-    onInit(owner) { const hasPerk = typeof hasTalentPerk === "function" && owner.uid && hasTalentPerk(owner.uid, "fortress"); const baseBoost = hasPerk ? 1.30 : 1.15; const boost = baseBoost + (owner.level||1) * 0.003; owner.effDef = Math.floor(owner._baseDef * Math.min(1.50, boost)); },
-    getEvoDesc:(lvl)=>`+${Math.min(35, 15 + Math.floor(lvl/2))}% Defense in battle` },
-  gale: { name:"Evasion", icon:"💨", desc:"10% chance to dodge attacks",
-    onDefend(owner) { const hasPerk = typeof hasTalentPerk === "function" && owner.uid && hasTalentPerk(owner.uid, "phantom"); const baseChance = hasPerk ? 0.25 : 0.10; const chance = baseChance + (owner.level||1) * 0.002; return Math.random() < Math.min(0.40, chance); },
-    getEvoDesc:(lvl)=>`${Math.min(25, 10 + Math.floor(lvl/2))}% chance to dodge attacks` }
+    getEvoDesc: (lvl) => `${Math.min(35, 15 + Math.floor(lvl / 3))}% chance to burn attackers`
+  },
+  aqua: {
+    name: "Tide", icon: "🌊", desc: "Heal 5% max HP at start of each turn",
+    onTurnStart(owner) { if (!owner.fainted && owner.hp < owner.baseHp) { const pct = 0.05 + (owner.level || 1) * 0.002; const amt = Math.max(1, Math.floor(owner.baseHp * Math.min(0.12, pct))); owner.hp = Math.min(owner.baseHp, owner.hp + amt); return amt; } return 0; },
+    getEvoDesc: (lvl) => `Heal ${Math.min(12, 5 + Math.floor(lvl / 2))}% max HP each turn`
+  },
+  verdant: {
+    name: "Thorns", icon: "🌿", desc: "Reflect 20% of damage back to attacker",
+    onHit(owner, attacker) { if (!owner.fainted && !attacker.fainted) { const hasPerk = typeof hasTalentPerk === "function" && owner.uid && hasTalentPerk(owner.uid, "thornmail"); const baseReflect = hasPerk ? 0.35 : 0.20; const reflectPct = baseReflect + (owner.level || 1) * 0.003; const reflect = Math.max(1, Math.floor(owner._lastDmg * Math.min(0.5, reflectPct))); attacker.hp = Math.max(0, attacker.hp - reflect); return reflect; } return 0; },
+    getEvoDesc: (lvl) => `Reflect ${Math.min(40, 20 + Math.floor(lvl / 2))}% damage back`
+  },
+  volt: {
+    name: "Static", icon: "⚡", desc: "+15% Speed in battle",
+    onInit(owner) { const hasPerk = typeof hasTalentPerk === "function" && owner.uid && hasTalentPerk(owner.uid, "overcharge"); const baseBoost = hasPerk ? 1.35 : 1.15; const boost = baseBoost + (owner.level || 1) * 0.003; owner.spd = Math.floor(owner._baseSpd * Math.min(1.55, boost)); },
+    getEvoDesc: (lvl) => `+${Math.min(35, 15 + Math.floor(lvl / 2))}% Speed in battle`
+  },
+  stone: {
+    name: "Fortify", icon: "🪨", desc: "+15% Defense in battle",
+    onInit(owner) { const hasPerk = typeof hasTalentPerk === "function" && owner.uid && hasTalentPerk(owner.uid, "fortress"); const baseBoost = hasPerk ? 1.30 : 1.15; const boost = baseBoost + (owner.level || 1) * 0.003; owner.effDef = Math.floor(owner._baseDef * Math.min(1.50, boost)); },
+    getEvoDesc: (lvl) => `+${Math.min(35, 15 + Math.floor(lvl / 2))}% Defense in battle`
+  },
+  gale: {
+    name: "Evasion", icon: "💨", desc: "10% chance to dodge attacks",
+    onDefend(owner) { const hasPerk = typeof hasTalentPerk === "function" && owner.uid && hasTalentPerk(owner.uid, "phantom"); const baseChance = hasPerk ? 0.25 : 0.10; const chance = baseChance + (owner.level || 1) * 0.002; return Math.random() < Math.min(0.40, chance); },
+    getEvoDesc: (lvl) => `${Math.min(25, 10 + Math.floor(lvl / 2))}% chance to dodge attacks`
+  }
 };
 function getPassive(type) { return PASSIVE_ABILITIES[type] || null; }
 function triggerPassiveOnInit(mon) {
@@ -432,7 +445,7 @@ function triggerPassiveOnInit(mon) {
   if (p && p.onInit) p.onInit(mon);
   mon.passive = p ? p.name : null;
   mon.passiveIcon = p ? p.icon : null;
-  mon.passiveDesc = p && p.getEvoDesc ? p.getEvoDesc(mon.level||1) : (p ? p.desc : null);
+  mon.passiveDesc = p && p.getEvoDesc ? p.getEvoDesc(mon.level || 1) : (p ? p.desc : null);
 }
 function triggerPassiveOnTurnStart(mon, logLines) {
   const p = getPassive(mon.type);
@@ -466,14 +479,14 @@ function triggerPassiveOnDefend(defender) {
 }
 
 const ELEMENTAL_COMBOS = {
-  "gale_ember": { name:"Firestorm", icon:"🌪️🔥", desc:"Bonus fire damage from wind-fanning", mult:1.5, effect:"dmgBoost", dur:"once" },
-  "volt_aqua": { name:"Thunderstorm", icon:"⚡🌊", desc:"Stunning bolt through water", mult:1.4, effect:"stun", dur:"once" },
-  "ember_stone": { name:"Magma Eruption", icon:"🔥🪨", desc:"Molten rock smash", mult:1.5, effect:"dmgBoost", dur:"once" },
-  "stone_verdant": { name:"Overgrowth", icon:"🪨🌿", desc:"Life springs from stone", mult:0.15, effect:"heal", dur:"once" },
-  "volt_gale": { name:"Tempest", icon:"⚡💨", desc:"Electrified winds batter the foe", mult:0.5, effect:"spdDmg", dur:"once" },
-  "verdant_aqua": { name:"Bloom", icon:"🌿🌊", desc:"Nourishing waters heal the team", mult:0.1, effect:"teamHeal", dur:"once" },
-  "ember_aqua_verdant": { name:"Seasonal Cycle", icon:"🔥🌊🌿", desc:"Nature's wrath reduces ATK", mult:2.0, effect:"atkDebuff", dur:"once" },
-  "stone_gale_volt": { name:"Cataclysm", icon:"🪨💨⚡", desc:"Tectonic fury reduces DEF", mult:2.0, effect:"defDebuff", dur:"once" }
+  "gale_ember": { name: "Firestorm", icon: "🌪️🔥", desc: "Bonus fire damage from wind-fanning", mult: 1.5, effect: "dmgBoost", dur: "once" },
+  "volt_aqua": { name: "Thunderstorm", icon: "⚡🌊", desc: "Stunning bolt through water", mult: 1.4, effect: "stun", dur: "once" },
+  "ember_stone": { name: "Magma Eruption", icon: "🔥🪨", desc: "Molten rock smash", mult: 1.5, effect: "dmgBoost", dur: "once" },
+  "stone_verdant": { name: "Overgrowth", icon: "🪨🌿", desc: "Life springs from stone", mult: 0.15, effect: "heal", dur: "once" },
+  "volt_gale": { name: "Tempest", icon: "⚡💨", desc: "Electrified winds batter the foe", mult: 0.5, effect: "spdDmg", dur: "once" },
+  "verdant_aqua": { name: "Bloom", icon: "🌿🌊", desc: "Nourishing waters heal the team", mult: 0.1, effect: "teamHeal", dur: "once" },
+  "ember_aqua_verdant": { name: "Seasonal Cycle", icon: "🔥🌊🌿", desc: "Nature's wrath reduces ATK", mult: 2.0, effect: "atkDebuff", dur: "once" },
+  "stone_gale_volt": { name: "Cataclysm", icon: "🪨💨⚡", desc: "Tectonic fury reduces DEF", mult: 2.0, effect: "defDebuff", dur: "once" }
 };
 
 function checkAndApplyCombo(side, attacker, defender, mv, dmg, logLines, arena) {
@@ -1402,10 +1415,10 @@ function showMonDetails(m) {
     
     <div style="font-size:12px; color:var(--text-dim); text-align:center; margin-top:10px;">
       ${EQUIP_SLOTS.map(s => {
-        const saveM = save.mons.find(x => x.uid === m.uid);
-        const key = saveM && saveM.equipment ? saveM.equipment[s] : "none";
-        return `<span style="margin:0 4px;">${s.charAt(0).toUpperCase()+s.slice(1)}: ${ITEMS[key]?ITEMS[key].name:"None"}</span>`;
-      }).join(" | ")}
+    const saveM = save.mons.find(x => x.uid === m.uid);
+    const key = saveM && saveM.equipment ? saveM.equipment[s] : "none";
+    return `<span style="margin:0 4px;">${s.charAt(0).toUpperCase() + s.slice(1)}: ${ITEMS[key] ? ITEMS[key].name : "None"}</span>`;
+  }).join(" | ")}
     </div>
     ${m.evolved ? `<div style="font-size:11px; color:var(--gold-dim); text-align:center; margin-top:6px;">✦ Evolution Passive Boost: ${m.passiveDesc || (getPassive(m.type) ? getPassive(m.type).desc : '')}</div>` : (() => { const pa = getPassive(m.type); return pa ? `<div style="font-size:11px; color:var(--xp-blue); text-align:center; margin-top:6px;">${pa.icon} Passive: ${pa.name} — ${m.passiveDesc || pa.desc}</div>` : ""; })()}
     
@@ -1995,7 +2008,7 @@ function spawnParticleBurst(element, type, isCrit) {
     burst.appendChild(part);
   }
   arena.appendChild(burst);
-  setTimeout(function() { if (burst.parentNode) burst.remove(); }, 800);
+  setTimeout(function () { if (burst.parentNode) burst.remove(); }, 800);
 }
 
 /* ============================= BATTLE SYSTEM (ASYNC RESOLUTION) ============================= */
@@ -2327,7 +2340,7 @@ function playerAct(action) {
       p.hp = p.baseHp;
       cureStatus(p);
       const pmEl = document.getElementById("player-mon");
-      if (pmEl) { pmEl.classList.remove("cured","status-applied"); void pmEl.offsetWidth; pmEl.classList.add("cured"); }
+      if (pmEl) { pmEl.classList.remove("cured", "status-applied"); void pmEl.offsetWidth; pmEl.classList.add("cured"); }
       itemLog = `<b>${p.name}</b> used ${bi.icon} ${bi.name} and fully recovered!`;
       playHealSound();
     } else if (action.itemKey === "atk_boost") {
@@ -2381,14 +2394,14 @@ async function resolveTurn(pAct, aiAct) {
     if (pm) { pm.classList.remove("switch-in"); void pm.offsetWidth; pm.classList.add("switch-in"); }
     const switchedP = activePlayer();
     logLines.push(`You send out <b>${switchedP.name}</b>!`);
-    
+
     // Tide Healer perk: heal 8% HP on switch-in
     if (switchedP.uid && typeof hasTalentPerk === "function" && hasTalentPerk(switchedP.uid, "tide")) {
       const healAmt = Math.max(1, Math.floor(switchedP.baseHp * 0.08));
       switchedP.hp = Math.min(switchedP.baseHp, switchedP.hp + healAmt);
       logLines.push(`🌊 Tide Healer restores <b>${healAmt}</b> HP to ${switchedP.name}!`);
     }
-    
+
     pActs = false;
     updateLog();
     await delay(1000);
@@ -2671,7 +2684,7 @@ function forcedSwitchTo(i) {
   renderBattle(true);
   const p = activePlayer();
   document.getElementById("battle-log").innerHTML = `You send out <b>${p.name}</b>!`;
-  
+
   // Tide Healer perk: heal 8% HP on switch-in
   if (p.uid && typeof hasTalentPerk === "function" && hasTalentPerk(p.uid, "tide")) {
     const healAmt = Math.max(1, Math.floor(p.baseHp * 0.08));
@@ -2679,7 +2692,7 @@ function forcedSwitchTo(i) {
     document.getElementById("battle-log").innerHTML += `<br>🌊 Tide Healer restores <b>${healAmt}</b> HP to ${p.name}!`;
     renderBattle(false);
   }
-  
+
   awaitingInput = true;
   buildActionPanel();
 }
@@ -3132,7 +3145,7 @@ if (document.getElementById("card-achievements")) {
 
 // Call updateAchievementsDash in refreshHome
 const _origRefreshHome = refreshHome;
-refreshHome = function() {
+refreshHome = function () {
   _origRefreshHome();
   if (typeof updateAchievementsDash === "function") updateAchievementsDash();
 };
