@@ -988,6 +988,11 @@ const SHOP_ITEMS = [
   { key:"guardcharm", name:"Guard Charm", desc:"-10% Dmg taken", priceGold:250, priceGems:0, icon:"🍀" },
   { key:"puredew", name:"Pure Dew", desc:"Cures status when HP<30%", priceGold:300, priceGems:0, icon:"💧" },
   { key:"steadfastsash", name:"Steadfast Sash", desc:"Survives lethal hit once", priceGold:400, priceGems:0, icon:"🧣" },
+  { key:"health_potion", name:"Health Potion", desc:"Heals 40% HP in battle", priceGold:120, priceGems:0, icon:"🧪" },
+  { key:"full_restore", name:"Full Restore", desc:"Heals 100% & cures status", priceGold:350, priceGems:0, icon:"💊" },
+  { key:"atk_boost", name:"ATK Booster", desc:"+30% ATK for one battle", priceGold:180, priceGems:0, icon:"⚔️" },
+  { key:"def_boost", name:"DEF Booster", desc:"+30% DEF for one battle", priceGold:180, priceGems:0, icon:"🛡️" },
+  { key:"spd_boost", name:"SPD Booster", desc:"+30% SPD for one battle", priceGold:180, priceGems:0, icon:"💨" },
   { key:"gems_pack", name:"Gem Pack (50💎)", desc:"50 gems for gold", priceGold:500, priceGems:0, icon:"💎" },
   { key:"stamina_refill", name:"Stamina Refill", desc:"+50 Stamina", priceGold:0, priceGems:50, icon:"⚡" },
 ];

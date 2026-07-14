@@ -14,6 +14,15 @@ const TIER_COLORS = { common: "#a8a2c4", uncommon: "#57d68d", rare: "#4facfe", e
 const TIER_NAMES = { common: "Common", uncommon: "Uncommon", rare: "Rare", epic: "Epic", legendary: "Legendary" };
 const EQUIP_SLOTS = ["weapon", "armor", "accessory"];
 
+const BATTLE_ITEMS = {
+  health_potion: { name: "Health Potion", desc: "Heals 40% HP in battle", icon: "🧪", tier: "uncommon", slot: "consumable", statBonus: {} },
+  full_restore: { name: "Full Restore", desc: "Heals 100% HP & cures status", icon: "💊", tier: "rare", slot: "consumable", statBonus: {} },
+  atk_boost: { name: "ATK Booster", desc: "+30% ATK for one battle", icon: "⚔️", tier: "uncommon", slot: "consumable", statBonus: {} },
+  def_boost: { name: "DEF Booster", desc: "+30% DEF for one battle", icon: "🛡️", tier: "uncommon", slot: "consumable", statBonus: {} },
+  spd_boost: { name: "SPD Booster", desc: "+30% SPD for one battle", icon: "💨", tier: "uncommon", slot: "consumable", statBonus: {} },
+};
+Object.assign(ITEMS, BATTLE_ITEMS);
+
 const ITEMS = {
   none: { name: "None", desc: "No item held.", tier: "common", slot: "any", statBonus: {} },
   quickfeather: { name: "Quick Feather", desc: "+10% Speed", tier: "uncommon", slot: "accessory", statBonus: {} },
@@ -853,7 +862,7 @@ function generateDefaultSave() {
     guild: null,
     achievements: [],
     stats: { bestStreak: 0, expeditionsCompleted: 0, itemsForged: 0, materialsFound: 0, dojoHours: 0, gearEquipped: 0, evolutionsPerformed: 0 },
-    bag: { vitalberry: 5, quickfeather: 2, ironscale: 2, puredew: 1, iron_ore: 3, leather: 2, cloth: 2 },
+    bag: { vitalberry: 5, quickfeather: 2, ironscale: 2, puredew: 1, iron_ore: 3, leather: 2, cloth: 2, health_potion: 5, full_restore: 1, atk_boost: 2, def_boost: 2, spd_boost: 2 },
     mons: [],
     matchHistory: []
   };
@@ -998,12 +1007,18 @@ function getMonData(uid) {
 
   const evoMult = evolved ? 1.25 : 1;
 
+  const finalHp = Math.floor(def[3] * scale * hpBonus * vMod.hp * evoMult * (1 + equipHp) * (1 + talentBonuses.hp) * (1 + guildBonuses.hp));
+  const finalAtk = Math.floor(def[4] * scale * atkBonus * vMod.atk * evoMult * (1 + equipAtk) * (1 + talentBonuses.atk) * (1 + guildBonuses.atk));
+  const finalDef = Math.floor(def[5] * scale * defBonus * vMod.def * evoMult * (1 + equipDef) * (1 + talentBonuses.def) * (1 + guildBonuses.def));
+  const finalSpd = Math.floor(def[6] * scale * spdBonus * vMod.spd * evoMult * (1 + equipSpd) * (1 + talentBonuses.spd) * (1 + guildBonuses.spd));
+
   return {
     uid: mSave.uid, baseId: def[0], name: displayName, type: displayType,
-    baseHp: Math.floor(def[3] * scale * hpBonus * vMod.hp * evoMult * (1 + equipHp) * (1 + talentBonuses.hp) * (1 + guildBonuses.hp)),
-    atk: Math.floor(def[4] * scale * atkBonus * vMod.atk * evoMult * (1 + equipAtk) * (1 + talentBonuses.atk) * (1 + guildBonuses.atk)),
-    def: Math.floor(def[5] * scale * defBonus * vMod.def * evoMult * (1 + equipDef) * (1 + talentBonuses.def) * (1 + guildBonuses.def)),
-    spd: Math.floor(def[6] * scale * spdBonus * vMod.spd * evoMult * (1 + equipSpd) * (1 + talentBonuses.spd) * (1 + guildBonuses.spd)),
+    baseHp: finalHp,
+    atk: finalAtk,
+    def: finalDef,
+    spd: finalSpd,
+    overallAffinity: Math.round(Math.max(finalHp, finalAtk, finalDef, finalSpd) / 4),
     item: mSave.heldItem, sigName: def[8], shape: def[9],
     level: lvl, xp: mSave.xp, onExpedition: mSave.onExpedition,
     maxXp: getMonMaxXp(lvl),
@@ -1314,7 +1329,7 @@ function renderRosterGrid() {
 
   getRosterMons().forEach(({ mSave, m }) => {
     const card = document.createElement("div");
-    card.className = "cmon-card " + (m.onExpedition ? "locked" : "");
+    card.className = "cmon-card roster-oa-card t-" + m.type + (m.onExpedition ? " locked" : "");
     const vBadge = m.variant ? `<span class="var-badge var-${m.variant}">${m.variantDef.icon}</span>` : "";
     const passive = getPassive(m.type);
     const evoTag = m.evolved ? `<span class="evo-badge">✦</span>` : "";
@@ -1326,6 +1341,7 @@ function renderRosterGrid() {
           <div class="type">${m.type}${passive ? ` · ${passive.icon} ${passive.name}` : ''} ${m.onExpedition ? '(Exploring)' : ''} ${m.variant ? m.variantDef.name : ''}</div>
         </div>
       </div>
+      <div class="roster-oa-row"><span class="roster-oa-label">OA</span><span class="roster-oa-val">${m.overallAffinity}</span></div>
       <div class="xp-bar" style="width:100%; margin-top:4px;"><div class="xp-fill" style="width:${(m.xp / m.maxXp) * 100}%"></div></div>
       <div class="xp-text">${formatNum(m.xp)} / ${formatNum(m.maxXp)} XP (${Math.round((m.xp / m.maxXp) * 100)}%)</div>
       ${passive && m.passiveDesc ? `<div class="passive-desc" style="font-size:10px;color:var(--text-dim);margin-top:2px;">${passive.icon} ${m.passiveDesc}</div>` : ''}
@@ -1363,6 +1379,12 @@ function showMonDetails(m) {
     <div style="text-align:center; font-family:var(--display); font-weight:800; font-size:22px;">${vTag} ${m.name} <span class="badge">Lv.${m.level}</span> ${evoTag}</div>
     ${m.evolved ? `<div style="text-align:center; font-size:11px; color:var(--gold);">✦ Evolution Bonus: +25% All Stats</div>` : (m.evolvesAt > 0 ? `<div style="text-align:center; font-size:11px; color:var(--text-dim);">Evolves at Lv.${m.evolvesAt} → ${m.evoName} (+25% all stats)</div>` : '')}
     
+    <div style="text-align:center; padding:6px; background:rgba(255,255,255,0.03); border-radius:10px; border:1px solid var(--line);">
+      <span style="font-size:11px; color:var(--text-dim); font-weight:700; letter-spacing:1px;">OA</span>
+      <span style="font-family:var(--display); font-weight:800; font-size:22px; margin-left:6px;">${m.overallAffinity}</span>
+      <span style="font-size:10px; color:var(--text-dim); margin-left:4px;">Highest stat ÷ 4</span>
+    </div>
+
     <div style="display:flex; flex-direction:column; gap:8px; margin-top:10px;">
       ${drawStat("HP", m.baseHp, 300)}
       ${drawStat("ATK", m.atk, 250)}
@@ -2087,6 +2109,37 @@ function buildActionPanel() {
   const swBtn = document.createElement("button"); swBtn.className = "movebtn switchbtn";
   swBtn.innerHTML = `<span class="mv-nm">Switch Out</span><span class="mv-sub">Change active</span>`;
   swBtn.onclick = () => openSwitchPanel(false); panel.appendChild(swBtn);
+
+  const bagBtn = document.createElement("button"); bagBtn.className = "movebtn";
+  bagBtn.innerHTML = `<span class="mv-nm">🎒 Bag</span><span class="mv-sub">Use item</span>`;
+  bagBtn.onclick = () => openBattleBag(); panel.appendChild(bagBtn);
+}
+
+function openBattleBag() {
+  const panel = document.getElementById("action-panel"); panel.className = "switch-panel"; panel.innerHTML = "";
+  const available = Object.keys(save.bag).filter(k => BATTLE_ITEMS[k] && save.bag[k] > 0);
+  if (available.length === 0) {
+    panel.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-dim);font-size:13px;">No consumable items available.</div>`;
+    const cancel = document.createElement("button"); cancel.className = "btn ghost"; cancel.textContent = "Back";
+    cancel.onclick = () => { panel.className = "moves-grid"; buildActionPanel(); };
+    panel.appendChild(cancel);
+    return;
+  }
+  available.forEach(itemKey => {
+    const bi = BATTLE_ITEMS[itemKey];
+    const p = activePlayer();
+    const opt = document.createElement("div"); opt.className = "switch-opt";
+    opt.innerHTML = `<div style="flex:1;display:flex;align-items:center;gap:8px;">
+      <span style="font-size:20px;">${bi.icon}</span>
+      <div><div style="font-weight:bold;font-size:14px;">${bi.name} <span style="font-size:10px;color:var(--text-dim);">x${save.bag[itemKey]}</span></div>
+      <div style="font-size:11px;color:var(--text-dim);">${bi.desc}</div></div>
+    </div>`;
+    opt.onclick = () => playerAct({ kind: "item", itemKey: itemKey });
+    panel.appendChild(opt);
+  });
+  const cancel = document.createElement("button"); cancel.className = "btn ghost"; cancel.textContent = "Cancel";
+  cancel.onclick = () => { panel.className = "moves-grid"; buildActionPanel(); };
+  panel.appendChild(cancel);
 }
 
 function openSwitchPanel(forced) {
@@ -2253,13 +2306,67 @@ function playerAct(action) {
   if (!awaitingInput || battle.over) return;
   awaitingInput = false;
   document.getElementById("action-panel").innerHTML = "";
+  if (action.kind === "item") {
+    const p = activePlayer();
+    const bi = BATTLE_ITEMS[action.itemKey];
+    if (!bi || !save.bag[action.itemKey] || save.bag[action.itemKey] <= 0) {
+      awaitingInput = true; buildActionPanel();
+      return;
+    }
+    save.bag[action.itemKey]--;
+    if (save.bag[action.itemKey] <= 0) delete save.bag[action.itemKey];
+    saveGame();
+
+    let itemLog = "";
+    if (action.itemKey === "health_potion") {
+      const heal = Math.round(p.baseHp * 0.4);
+      p.hp = Math.min(p.baseHp, p.hp + heal);
+      itemLog = `<b>${p.name}</b> used ${bi.icon} ${bi.name} and restored <b>${heal}</b> HP!`;
+      playHealSound();
+    } else if (action.itemKey === "full_restore") {
+      p.hp = p.baseHp;
+      cureStatus(p);
+      const pmEl = document.getElementById("player-mon");
+      if (pmEl) { pmEl.classList.remove("cured","status-applied"); void pmEl.offsetWidth; pmEl.classList.add("cured"); }
+      itemLog = `<b>${p.name}</b> used ${bi.icon} ${bi.name} and fully recovered!`;
+      playHealSound();
+    } else if (action.itemKey === "atk_boost") {
+      p.battleAtkBoost = (p.battleAtkBoost || 1) * 1.3;
+      itemLog = `<b>${p.name}</b> used ${bi.icon} ${bi.name} — ATK boosted!`;
+      playHealSound();
+    } else if (action.itemKey === "def_boost") {
+      p.battleDefBoost = (p.battleDefBoost || 1) * 1.3;
+      itemLog = `<b>${p.name}</b> used ${bi.icon} ${bi.name} — DEF boosted!`;
+      playHealSound();
+    } else if (action.itemKey === "spd_boost") {
+      p.battleSpdBoost = (p.battleSpdBoost || 1) * 1.3;
+      itemLog = `<b>${p.name}</b> used ${bi.icon} ${bi.name} — SPD boosted!`;
+      playHealSound();
+    }
+
+    const pmEl2 = document.getElementById("player-mon");
+    if (pmEl2) {
+      pmEl2.classList.remove("item-activate"); void pmEl2.offsetWidth;
+      pmEl2.classList.add("item-activate");
+    }
+
+    const logEl = document.getElementById("battle-log");
+    logEl.innerHTML += "<br>" + itemLog;
+    logEl.scrollTop = logEl.scrollHeight;
+
+    renderBattle(false);
+    const aiAct = aiPickAction();
+    resolveTurn({ kind: "item_used" }, aiAct);
+    return;
+  }
+
   const aiAct = aiPickAction();
   resolveTurn(action, aiAct);
 }
 
 async function resolveTurn(pAct, aiAct) {
   const logLines = [];
-  let pActs = true, aiActs = true;
+  let pActs = pAct.kind !== "item_used", aiActs = true;
 
   const updateLog = () => {
     const logEl = document.getElementById("battle-log");
@@ -2377,7 +2484,7 @@ async function resolveTurn(pAct, aiAct) {
 
     const isCrit = Math.random() < 0.08;
     const atkMult = (atk.statusAtkMult || 1);
-    let raw = (atk.atk * atkMult / def.effDef) * mv.power * 0.5 * mult * weatherMult * (0.85 + Math.random() * 0.15);
+    let raw = (atk.atk * atkMult * (atk.battleAtkBoost || 1) / (def.effDef * (def.battleDefBoost || 1))) * mv.power * 0.5 * mult * weatherMult * (0.85 + Math.random() * 0.15);
     if (isCrit) raw *= 1.8;
     if (def.item === "guardcharm") raw *= 0.9;
     let dmg = Math.max(1, Math.round(raw));
