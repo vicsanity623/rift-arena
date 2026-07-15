@@ -1396,7 +1396,7 @@ function showMonDetails(m) {
     <div style="text-align:center; padding:6px; background:rgba(255,255,255,0.03); border-radius:10px; border:1px solid var(--line);">
       <span style="font-size:11px; color:var(--text-dim); font-weight:700; letter-spacing:1px;">OA</span>
       <span style="font-family:var(--display); font-weight:800; font-size:22px; margin-left:6px;">${m.overallAffinity}</span>
-      <span style="font-size:10px; color:var(--text-dim); margin-left:4px;">Highest stat ÷ 4</span>
+      <span style="font-size:10px; color:var(--text-dim); margin-left:4px;">Overall Affinity</span>
     </div>
 
     <div style="display:flex; flex-direction:column; gap:8px; margin-top:10px;">
