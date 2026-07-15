@@ -17,7 +17,19 @@ const ASSETS = [
   '/assets/creatures/tidenne.PNG',
   '/assets/creatures/verdil.PNG',
   '/assets/creatures/voltigo.PNG',
-  '/assets/creatures/zephyrn.PNG'
+  '/assets/creatures/zephyrn.PNG',
+  '/assets/creatures/boulderon_evolved.PNG',
+  '/assets/creatures/cindrake_evolved.PNG',
+  '/assets/creatures/coralisk_evolved.PNG',
+  '/assets/creatures/gustling_evolved.PNG',
+  '/assets/creatures/pebblin_evolved.PNG',
+  '/assets/creatures/pyrelope_evolved.PNG',
+  '/assets/creatures/sparkit_evolved.PNG',
+  '/assets/creatures/thornuke_evolved.PNG',
+  '/assets/creatures/tidenne_evolved.PNG',
+  '/assets/creatures/verdil_evolved.PNG',
+  '/assets/creatures/voltigo_evolved.PNG',
+  '/assets/creatures/zephyrn_evolved.PNG'
 ];
 
 self.addEventListener('install', event => {
