@@ -73,6 +73,11 @@
           <div class="label">Dojo</div>
           <div class="desc" id="dojo-status">Training</div>
         </div>
+        <div class="dash-card" id="card-journey">
+          <div class="icon-bg">🚶</div>
+          <div class="label">Journey</div>
+          <div class="desc" id="journey-dash">Start</div>
+        </div>
       </div>
     </div>
 
@@ -378,6 +383,46 @@
   <!-- DUNGEON FLOOR END -->
   <section class="screen" id="screen-dungeon-floor-end">
     <div class="end-wrap" id="dungeon-floor-end-content"></div>
+  </section>
+
+  <!-- JOURNEY MODE - SINGLE CREATURE SELECT -->
+  <section class="screen" id="screen-journey-select">
+    <div class="backrow"><button class="iconbtn" data-back="screen-home">←</button><h2>Select Your Traveler</h2></div>
+    <p class="subtitle">Choose one Rift-form to embark on the Journey. Progress is saved — you can resume from your highest stage on your next run with full health.</p>
+    <div class="roster-grid" id="journey-select-grid"></div>
+    <div class="footer-bar">
+      <button class="btn gold" id="btn-journey-start" disabled>Begin Journey</button>
+    </div>
+  </section>
+
+  <!-- JOURNEY MODE - AUTO-RUNNER -->
+  <section class="screen" id="screen-journey">
+    <div class="journey-hud">
+      <div class="journey-stage-badge">Stage <span id="journey-stage-num">1</span></div>
+      <div class="journey-creature-hp">
+        <span class="journey-creature-name" id="journey-creature-name">—</span>
+        <div class="hpbar-track"><div class="hpbar-fill" id="journey-creature-hp"></div></div>
+      </div>
+      <div class="journey-enemy-count" id="journey-enemy-count">⚔️ x0</div>
+    </div>
+    <div class="journey-field" id="journey-field">
+      <div class="journey-runner" id="journey-runner"></div>
+      <div class="journey-bg-scroll" id="journey-bg-scroll"></div>
+    </div>
+    <div class="journey-log" id="journey-log">Your journey begins...</div>
+    <div class="journey-actions" id="journey-actions"></div>
+  </section>
+
+  <!-- JOURNEY END -->
+  <section class="screen" id="screen-journey-end">
+    <div class="end-wrap">
+      <div class="end-banner" id="journey-end-banner">Journey Complete</div>
+      <div class="rewards-box" id="journey-end-rewards"></div>
+      <div class="end-actions" style="flex-direction:column;">
+        <button class="btn gold" id="btn-journey-retry">Journey Again</button>
+        <button class="btn ghost" data-back="screen-home">Home</button>
+      </div>
+    </div>
   </section>
 
   <!-- CUSTOM MODAL NOTIFICATION -->

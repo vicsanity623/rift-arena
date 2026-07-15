@@ -1171,6 +1171,7 @@ function refreshHome() {
   if (typeof updateDojoDash === "function") updateDojoDash();
   if (typeof updateTourneyDashboard === "function") updateTourneyDashboard();
   if (typeof updateDungeonDash === "function") updateDungeonDash();
+  if (typeof updateJourneyDash === "function") updateJourneyDash();
   if (typeof initDailyLoginUI === "function") initDailyLoginUI();
   if (typeof initGuildUI === "function") initGuildUI();
   // Update guild dash status
@@ -1242,6 +1243,16 @@ document.getElementById("card-forge").addEventListener("click", () => { if (type
 document.getElementById("card-bag").addEventListener("click", () => { initBagUI(); show("screen-bag"); });
 if (document.getElementById("card-shop")) document.getElementById("card-shop").addEventListener("click", () => { initShopUI(); show("screen-shop"); });
 if (document.getElementById("card-dojo")) document.getElementById("card-dojo").addEventListener("click", () => { initDojoUI(); show("screen-dojo"); });
+if (document.getElementById("card-journey")) {
+  document.getElementById("card-journey").addEventListener("click", () => {
+    if (journeyState && !journeyState.over) {
+      show("screen-journey");
+      return;
+    }
+    initJourneySelect();
+    show("screen-journey-select");
+  });
+}
 
 document.getElementById("card-battle").addEventListener("click", () => {
   if (save.mons.filter(m => !m.onExpedition).length < 3) return showModal({ icon: "⚠️", title: "Cannot Battle", message: "You need at least 3 Rift-forms available to battle." });
@@ -2896,6 +2907,10 @@ function endBattle(won) {
   battle.over = true;
   if (won) playVictorySound(); else playDefeatSound();
 
+  if (battle.journey) {
+    if (typeof handleJourneyBattleEnd === "function") handleJourneyBattleEnd(won);
+    return;
+  }
   if (battle.survival) {
     if (typeof handleSurvivalWaveEnd === "function") handleSurvivalWaveEnd(won);
     return;
@@ -3138,7 +3153,12 @@ if (document.getElementById("card-dungeon")) {
 }
 
 if (document.getElementById("btn-rematch")) {
-  document.getElementById("btn-rematch").addEventListener("click", () => {
+  document.getElementById("btn-journey-start").addEventListener("click", () => {
+  const uid = document.getElementById("btn-journey-start").dataset.uid;
+  if (uid) startJourney(uid);
+});
+
+document.getElementById("btn-rematch").addEventListener("click", () => {
     if (battle) {
       const prevUids = battle.player.map(m => m.uid);
       startMatchmaking(prevUids);
