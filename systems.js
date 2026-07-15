@@ -1142,15 +1142,33 @@ function setCreatureSprite(el, baseId, evolved) {
 }
 
 // --- LAB / BREEDING SYSTEM ---
+// --- LAB / BREEDING SYSTEM ---
 function initLabUI() {
   const container = document.getElementById("lab-content");
   container.innerHTML = "";
 
-  const eligibleMons = save.mons.filter(m => !m.onExpedition && m.level >= 10);
+  // MODIFIED: Restructured filter to enforce Rule 1 (1 breed limit) and Rule 2 (30-day offspring cooldown)
+  const eligibleMons = save.mons.filter(m => {
+    if (m.onExpedition) return false;
+    if (m.level < 10) return false;
+
+    // RULE 1: Parent can only breed once in its lifetime
+    if ((m.breedCount || 0) >= 1) return false;
+
+    // RULE 2: Bred offspring must wait 30 real-world days to breed
+    if (m.bornAt && m.bornAt > 0) {
+      const ageMs = Date.now() - m.bornAt;
+      const cooldownMs = 30 * 24 * 60 * 60 * 1000; // 30 days in milliseconds
+      if (ageMs < cooldownMs) return false;
+    }
+
+    return true;
+  });
+
   if (eligibleMons.length < 2) {
     container.innerHTML = `<div class="details-card" style="text-align:center;">
       <h3>🧬 Breeding Lab</h3>
-      <p style="color:var(--text-dim);">Need at least 2 Rift-forms at Lv.10+ to breed. Send them on expeditions or train them!</p>
+      <p style="color:var(--text-dim);">Need at least 2 eligible Rift-forms at Lv.10+ to breed. Original parents can only breed once, and offspring require 30 days to mature!</p>
       <button class="btn ghost" data-back="screen-home">Back</button>
     </div>`;
     return;
@@ -1172,7 +1190,7 @@ function initLabUI() {
     <div style="display:flex; flex-direction:column; gap:12px;">
       <div class="details-card" style="align-items:center; text-align:center;">
         <h3>Select Breeders</h3>
-        <p class="subtitle">Breed two high-level Rift-forms to create a new Variant offspring at Lv.1 with blended inherited stats and a random 10-20% mutation bonus. Parents are kept in your roster.</p>
+        <p class="subtitle">Breed two high-level Rift-forms to create a new Variant offspring at Lv.1 with blended inherited stats and a random 10-20% mutation bonus. Parents are kept in your roster but can never breed again.</p>
       </div>
       <div style="display:flex; flex-direction:column; gap:8px;">
         <label style="font-size:12px; color:var(--text-dim);">Parent A (Lv.10+):</label>
@@ -1278,17 +1296,24 @@ function initLabUI() {
     const offDefBonus = Math.max(0, (avgDef * mutationMult) / offBaseDef - 1);
     const offSpdBonus = Math.max(0, (avgSpd * mutationMult) / offBaseSpd - 1);
 
+    m1.breedCount = (m1.breedCount || 0) + 1;
+    m2.breedCount = (m2.breedCount || 0) + 1;
+
     const uid = "breed_" + Date.now().toString() + Math.floor(Math.random() * 100);
     save.mons.push({
       uid, baseId: chosenDef[0], level: 1, xp: 0,
       heldItem: "none",
       mergeBonuses: { hp: offHpBonus, atk: offAtkBonus, def: offDefBonus, spd: offSpdBonus },
       onExpedition: false,
-      evolved: false, variant: childVariant, mp: 0, talents: []
+      evolved: false, 
+      variant: childVariant, 
+      mp: 0, 
+      talents: [],
+      breedCount: 0,      // Offspring starts with 0 breeding actions used
+      bornAt: Date.now()  // NEW: Stamp the creation time to enforce the 30-day maturity cooldown
     });
-
     saveGame();
-    showModal({ icon: "🧬", title: "Gene Synthesis Complete!", message: `Offspring created with inherited stats!<br>${vDef.icon} ${vDef.name} ${chosenDef[1]} (Lv.1)<br><br>Parents remain in your roster.` });
+    showModal({ icon: "🧬", title: "Gene Synthesis Complete!", message: `Offspring created with inherited stats!<br>${vDef.icon} ${vDef.name} ${chosenDef[1]} (Lv.1)<br><br>Parents remain in your roster but can never breed again.` });
     refreshHome();
     initLabUI();
   };
