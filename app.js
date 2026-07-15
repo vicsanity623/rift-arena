@@ -56,6 +56,8 @@ const ITEMS = {
 Object.assign(ITEMS, BATTLE_ITEMS);
 
 const CRAFTING_RECIPES = [
+  { id: "health_potion", name: "Health Potion", goldCost: 80, materials: [{ key: "cloth", qty: 1 }, { key: "essence_nature", qty: 1 }] },
+  { id: "full_restore", name: "Full Restore", goldCost: 200, materials: [{ key: "crystal_shard", qty: 1 }, { key: "essence_nature", qty: 2 }, { key: "essence_water", qty: 1 }] },
   { id: "leather_bracers", name: "Leather Bracers", goldCost: 100, materials: [{ key: "leather", qty: 2 }, { key: "cloth", qty: 1 }] },
   { id: "iron_helm", name: "Iron Helm", goldCost: 150, materials: [{ key: "iron_ore", qty: 3 }, { key: "leather", qty: 1 }] },
   { id: "silver_ring", name: "Silver Ring", goldCost: 300, materials: [{ key: "crystal_shard", qty: 2 }, { key: "essence_nature", qty: 1 }, { key: "cloth", qty: 1 }] },
