@@ -1195,7 +1195,7 @@ setInterval(() => {
       regenEl.textContent = nextMs > 0 ? `+10 in ${formatStaminaRegen(nextMs)}` : "Full";
     }
   }
-}, 5000);
+}, 1000);
 
 document.getElementById("card-idle").addEventListener("click", () => {
   const diff = Date.now() - save.lastIdleClaim;
