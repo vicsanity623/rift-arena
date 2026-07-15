@@ -399,7 +399,21 @@
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js').catch(err => console.log('SW Reg Failed:', err));
+      navigator.serviceWorker.register('sw.js')
+        .then(reg => {
+          setInterval(() => {
+            reg.update();
+          }, 60 * 60 * 1000);
+        })
+        .catch(err => console.log('SW Reg Failed:', err));
+
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+          refreshing = true;
+          window.location.reload(); // Instantly reloads the page to load fresh assets from main
+        }
+      });
     });
   }
 </script>
