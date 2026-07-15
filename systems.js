@@ -821,7 +821,7 @@ function updateExploreDash() {
   }
 }
 
-setInterval(updateExploreDash, 5000);
+setInterval(updateExploreDash, 1000);
 
 // --- DOJO STATUS ON DASHBOARD ---
 function updateDojoDash() {
@@ -838,7 +838,7 @@ function updateDojoDash() {
   }
 }
 
-setInterval(updateDojoDash, 5000);
+setInterval(updateDojoDash, 1000);
 
 // --- MERGE SYSTEM ---
 function initMergeUI() {
@@ -2250,7 +2250,7 @@ function updateDungeonDash() {
   }
 }
 
-setInterval(updateDungeonDash, 5000);
+setInterval(updateDungeonDash, 1000);
 
 // --- FORGE / CRAFTING SYSTEM ---
 function initForgeUI() {
