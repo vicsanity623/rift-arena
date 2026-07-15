@@ -874,6 +874,7 @@ function generateDefaultSave() {
     dailyLogin: { date: "", streak: 0, claimed: false },
     guild: null,
     achievements: [],
+    creatureDust: 0,
     stats: { bestStreak: 0, expeditionsCompleted: 0, itemsForged: 0, materialsFound: 0, dojoHours: 0, gearEquipped: 0, evolutionsPerformed: 0 },
     bag: { vitalberry: 5, quickfeather: 2, ironscale: 2, puredew: 1, iron_ore: 3, leather: 2, cloth: 2, health_potion: 5, full_restore: 1, atk_boost: 2, def_boost: 2, spd_boost: 2 },
     mons: [],
@@ -889,11 +890,13 @@ let save = (function () {
   let s;
   try { const raw = localStorage.getItem(SAVE_KEY); if (raw) s = { ...generateDefaultSave(), ...JSON.parse(raw) }; } catch (e) { }
   if (!s) s = generateDefaultSave();
+  if (s.creatureDust === undefined) s.creatureDust = 0;
   s.mons.forEach(m => {
     if (m.evolved === undefined) m.evolved = false;
     if (m.variant === undefined) m.variant = null;
     if (m.mp === undefined) m.mp = 0;
     if (m.talents === undefined) m.talents = [];
+    if (m.dustDaily === undefined) m.dustDaily = { date: "", count: 0 };
     if (m.equipment === undefined) {
       const itemKey = m.heldItem || "none";
       m.equipment = { weapon: "none", armor: "none", accessory: "none" };
@@ -1309,6 +1312,127 @@ if (document.getElementById("card-lab")) {
 }
 refreshHome();
 
+/* ============================= CREATURE DUST SYSTEM ============================= */
+function calculateReleaseDustValue(uid) {
+  const mSave = save.mons.find(m => m.uid === uid);
+  if (!mSave) return 0;
+  
+  let dust = 50; // Base value for releasing
+  dust += (mSave.level - 1) * 10; // +10 Dust per level gained
+  if (mSave.variant) dust += 100; // +100 bonus Dust for rare variants
+  if (mSave.evolved) dust += 200; // +200 bonus Dust for evolved Alphas/Omegas
+  return dust;
+}
+
+function confirmReleaseCreature(uid) {
+  const mSave = save.mons.find(m => m.uid === uid);
+  if (!mSave) return;
+  
+  // Guard check: Prevent releasing if player has 3 or fewer creatures
+  if (save.mons.length <= 3) {
+    return showModal({ 
+      icon: "⚠️", 
+      title: "Release Failed", 
+      message: "You must keep at least 3 active Rift-forms in your roster to maintain a full battle team." 
+    });
+  }
+
+  const m = getMonData(uid);
+  const dustVal = calculateReleaseDustValue(uid);
+
+  showModal({
+    icon: "🍃",
+    title: "Release Creature?",
+    message: `Are you sure you want to release <b>${m.name}</b>?<br><br>This will permanently remove them from your roster and grant you <b style="color:#38bdf8;">🧪 ${dustVal} Creature Dust</b>. This action cannot be undone.`,
+    buttons: [
+      {
+        label: "Cancel",
+        primary: false
+      },
+      {
+        label: "Release",
+        primary: true,
+        callback: () => {
+          // Remove from roster save array
+          save.mons = save.mons.filter(x => x.uid !== uid);
+          save.creatureDust = (save.creatureDust || 0) + dustVal;
+          saveGame();
+          refreshHome();
+          showModal({ 
+            icon: "🍃", 
+            title: "Creature Released", 
+            message: `You parted ways with ${m.name} and received <b style="color:#38bdf8;">🧪 ${dustVal} Creature Dust</b>!` 
+          });
+          // Return to roster view
+          renderRosterGrid();
+          show("screen-roster");
+        }
+      }
+    ]
+  });
+}
+
+function ingestCreatureDust(uid) {
+  const mSave = save.mons.find(m => m.uid === uid);
+  if (!mSave) return;
+
+  const dustCost = 100;
+  const currentDust = save.creatureDust || 0;
+  
+  if (currentDust < dustCost) {
+    return showModal({ 
+      icon: "🧪", 
+      title: "Not Enough Dust", 
+      message: `You need at least <b>${dustCost} Creature Dust</b> to feed your creature. Release unwanted duplicates in your Roster to recycle them into Dust!` 
+    });
+  }
+
+  const today = getDateString();
+  if (!mSave.dustDaily) mSave.dustDaily = { date: "", count: 0 };
+  if (mSave.dustDaily.date !== today) {
+    mSave.dustDaily.date = today;
+    mSave.dustDaily.count = 0;
+  }
+
+  // Daily limit check: max 1000 dust per day (10 ingestions)
+  if (mSave.dustDaily.count >= 10) {
+    return showModal({ 
+      icon: "⏳", 
+      title: "Daily Limit Reached", 
+      message: `This creature has already ingested the maximum of <b>1,000 Creature Dust</b> today. Wait until tomorrow to feed them more!` 
+    });
+  }
+
+  // Deduct dust and apply permanent +2% stat bonuses directly to mergeBonuses multipliers
+  save.creatureDust -= dustCost;
+  mSave.dustDaily.count++;
+
+  if (!mSave.mergeBonuses) mSave.mergeBonuses = { hp: 0, atk: 0, def: 0, spd: 0 };
+  mSave.mergeBonuses.hp = (mSave.mergeBonuses.hp || 0) + 0.02;
+  mSave.mergeBonuses.atk = (mSave.mergeBonuses.atk || 0) + 0.02;
+  mSave.mergeBonuses.def = (mSave.mergeBonuses.def || 0) + 0.02;
+  mSave.mergeBonuses.spd = (mSave.mergeBonuses.spd || 0) + 0.02;
+
+  saveGame();
+  const updated = getMonData(uid);
+  playHealSound();
+  
+  // Flash animation effect
+  const spr = document.getElementById("detail-sprite-" + uid);
+  if (spr) {
+    spr.classList.remove("item-activate"); void spr.offsetWidth; spr.classList.add("item-activate");
+  }
+
+  showModal({
+    icon: "🧪",
+    title: "Gene Synthesis Boosted!",
+    message: `Fed 100 Creature Dust to <b>${updated.name}</b>!<br><br>All base stats permanently increased by <b style="color:var(--safe);">+2%</b>!<br>Daily limit: ${mSave.dustDaily.count * 100} / 1,000 Dust used.`
+  });
+  
+  refreshHome();
+  showMonDetails(updated);
+}
+
 /* ============================= ROSTER & DETAILS ============================= */
 function statLine(m) { return `HP ${m.baseHp} · ATK ${m.atk} · DEF ${m.def} · SPD ${m.spd}`; }
 
@@ -1388,6 +1512,11 @@ function showMonDetails(m) {
 
   const vTag = m.variant ? `<div class="var-badge var-${m.variant}" style="display:inline-block; font-size:13px; padding:2px 10px;">${m.variantDef.icon} ${m.variantDef.name}</div>` : "";
   const evoTag = m.evolved ? `<span class="evo-badge-lg">✦ EVOLVED</span>` : "";
+  
+  // Calculate daily ingestion limit display
+  const mSave = save.mons.find(x => x.uid === m.uid);
+  const dailyCount = mSave && mSave.dustDaily && mSave.dustDaily.date === getDateString() ? mSave.dustDaily.count : 0;
+
   view.innerHTML = `
     <div class="orb mon-big-orb sprite-orb t-${m.type} ${m.evolved ? 'evo-orb-glow' : ''}" id="detail-sprite-${m.uid}" style="transform:scale(1.8); margin:30px 0;"></div>
     <div style="text-align:center; font-family:var(--display); font-weight:800; font-size:22px;">${vTag} ${m.name} <span class="badge">Lv.${m.level}</span> ${evoTag}</div>
@@ -1416,16 +1545,32 @@ function showMonDetails(m) {
     
     <div style="font-size:12px; color:var(--text-dim); text-align:center; margin-top:10px;">
       ${EQUIP_SLOTS.map(s => {
-    const saveM = save.mons.find(x => x.uid === m.uid);
-    const key = saveM && saveM.equipment ? saveM.equipment[s] : "none";
-    return `<span style="margin:0 4px;">${s.charAt(0).toUpperCase() + s.slice(1)}: ${ITEMS[key] ? ITEMS[key].name : "None"}</span>`;
-  }).join(" | ")}
+        const saveM = save.mons.find(x => x.uid === m.uid);
+        const key = saveM && saveM.equipment ? saveM.equipment[s] : "none";
+        return `<span style="margin:0 4px;">${s.charAt(0).toUpperCase() + s.slice(1)}: ${ITEMS[key] ? ITEMS[key].name : "None"}</span>`;
+      }).join(" | ")}
     </div>
     ${m.evolved ? `<div style="font-size:11px; color:var(--gold-dim); text-align:center; margin-top:6px;">✦ Evolution Passive Boost: ${m.passiveDesc || (getPassive(m.type) ? getPassive(m.type).desc : '')}</div>` : (() => { const pa = getPassive(m.type); return pa ? `<div style="font-size:11px; color:var(--xp-blue); text-align:center; margin-top:6px;">${pa.icon} Passive: ${pa.name} — ${m.passiveDesc || pa.desc}</div>` : ""; })()}
     
-    <button class="btn gold" id="btn-lvlup" style="margin-top:10px;" ${m.onExpedition ? 'disabled' : ''}>Level Up (${formatNum(upgCost)} Gold)</button>
-    ${(!m.evolved && m.evolvesAt > 0 && m.level >= m.evolvesAt) ? `<button class="btn gold" id="btn-evolve" style="margin-top:8px; background:linear-gradient(135deg, #c084fc, #8b5cf6); color:white; border:none;">✨ Evolve to ${m.evoName} (FREE)</button>` : ''}
-    <button class="btn ghost" id="btn-talents" style="margin-top:8px; border-color:var(--gold-dim); color:var(--gold);">✦ Talents Mastery (${getMasteryPoints(m.uid)} MP)</button>
+    <!-- Dust status line -->
+    <div style="font-size:12px; color:#38bdf8; text-align:center; margin-top:10px; font-family:var(--mono);">
+      🧪 Your Creature Dust: <b>${formatNum(save.creatureDust || 0)}</b>
+      <span style="font-size:10px; color:var(--text-dim); margin-left:6px;">(Limit Today: ${dailyCount * 100}/1,000)</span>
+    </div>
+
+    <!-- Details actions panel -->
+    <div style="display:flex; flex-direction:column; gap:8px; margin-top:10px;">
+      <button class="btn gold" id="btn-lvlup" style="margin-top:0;" ${m.onExpedition ? 'disabled' : ''}>Level Up (${formatNum(upgCost)} Gold)</button>
+      
+      <div style="display:flex; gap:8px; width:100%;">
+        <button class="btn ghost" id="btn-talents" style="flex:1; border-color:var(--gold-dim); color:var(--gold);">✦ Talents (${getMasteryPoints(m.uid)} MP)</button>
+        <button class="btn ghost" id="btn-ingest-dust" style="flex:1; border-color:#38bdf8; color:#38bdf8; transition:0.2s;">🧪 Ingest Dust</button>
+      </div>
+      
+      ${(!m.evolved && m.evolvesAt > 0 && m.level >= m.evolvesAt) ? `<button class="btn gold" id="btn-evolve" style="background:linear-gradient(135deg, #c084fc, #8b5cf6); color:white; border:none;">✨ Evolve to ${m.evoName} (FREE)</button>` : ''}
+      
+      <button class="btn ghost" id="btn-release-mon" style="border-color:var(--danger); color:var(--danger); opacity:0.8; transition:0.2s;">🍃 Release Creature (Recycle)</button>
+    </div>
   `;
 
   show("screen-details");
@@ -1459,6 +1604,10 @@ function showMonDetails(m) {
   if (talentBtn) {
     talentBtn.onclick = () => showTalentTree(m.uid);
   }
+
+  // Ingest & Release button listeners
+  document.getElementById("btn-ingest-dust").onclick = () => ingestCreatureDust(m.uid);
+  document.getElementById("btn-release-mon").onclick = () => confirmReleaseCreature(m.uid);
 }
 
 /* ============================= EVOLUTION SYSTEM ============================= */
