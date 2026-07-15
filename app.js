@@ -899,6 +899,8 @@ let save = (function () {
     if (m.mp === undefined) m.mp = 0;
     if (m.talents === undefined) m.talents = [];
     if (m.dustDaily === undefined) m.dustDaily = { date: "", count: 0 };
+    if (m.breedCount === undefined) m.breedCount = 0; // 0 means has never bred, limit is 1
+    if (m.bornAt === undefined) m.bornAt = 0;
     if (m.equipment === undefined) {
       const itemKey = m.heldItem || "none";
       m.equipment = { weapon: "none", armor: "none", accessory: "none" };
