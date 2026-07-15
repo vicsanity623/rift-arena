@@ -2224,6 +2224,18 @@ function revealFoeAndBattle() {
 function activePlayer() { return battle.player[battle.pIndex]; }
 function activeFoe() { return battle.foe[battle.fIndex]; }
 
+document.getElementById("btn-forfeit").addEventListener("click", () => {
+  if (!battle || battle.over) return;
+  showModal({
+    icon: "🏳️", title: "Forfeit Match?",
+    message: "Are you sure you want to forfeit? This counts as a loss.",
+    buttons: [
+      { label: "Cancel", primary: false },
+      { label: "Forfeit", primary: true, callback: () => endBattle(false) }
+    ]
+  });
+});
+
 function renderBattle(fullRebuild) {
   const p = activePlayer(), f = activeFoe();
   document.getElementById("ally-name").textContent = p.name; document.getElementById("ally-level").textContent = "Lv." + p.level;
@@ -2277,11 +2289,21 @@ function renderBattle(fullRebuild) {
   }
 }
 
+function getEffectivenessLabel(atkType, defType) {
+  const mult = typeMultiplier(atkType, defType);
+  if (mult > 1) return { text: "SUPER", cls: "fx-superb" };
+  if (mult === 0) return { text: "NO EFFECT", cls: "fx-weak" };
+  if (mult < 1) return { text: "NOT VERY", cls: "fx-weak" };
+  return null;
+}
+
 function buildActionPanel() {
   const panel = document.getElementById("action-panel"); panel.className = "moves-grid"; panel.innerHTML = "";
+  const foeType = activeFoe().type;
   activePlayer().moves.forEach(mv => {
-    const btn = document.createElement("button"); btn.className = "movebtn";
-    btn.innerHTML = `<span class="mv-nm">${mv.name}</span><span class="mv-sub">${mv.type.toUpperCase()} · PWR ${mv.power}</span>`;
+    const eff = getEffectivenessLabel(mv.type, foeType);
+    const btn = document.createElement("button"); btn.className = "movebtn" + (eff ? " " + eff.cls : "");
+    btn.innerHTML = `<span class="mv-nm">${mv.name}</span><span class="mv-sub">${mv.type.toUpperCase()} · PWR ${mv.power}${eff ? `<span class="${eff.cls}" style="margin-left:6px;">${eff.text}</span>` : ''}</span>`;
     btn.onclick = () => playerAct({ kind: "move", move: mv }); panel.appendChild(btn);
   });
   const swBtn = document.createElement("button"); swBtn.className = "movebtn switchbtn";
@@ -2684,6 +2706,12 @@ async function resolveTurn(pAct, aiAct) {
     def._lastDmg = dmg;
     def.hp = Math.max(0, def.hp - dmg);
 
+    const hpTrackEl = document.getElementById(side === "p" ? "foe-hp" : "ally-hp").parentElement;
+    if (hpTrackEl) {
+      hpTrackEl.classList.remove("damage-flash"); void hpTrackEl.offsetWidth;
+      hpTrackEl.classList.add("damage-flash");
+    }
+
     let dmgLog = `${atk.name} used ${mv.name} for ${dmg} damage.`;
     if (isCrit) dmgLog += " <b style='color:var(--danger);'>Critical hit!</b>";
     if (mult > 1) dmgLog += " <b style='color:var(--gold)'>Super effective!</b>";
@@ -2952,6 +2980,10 @@ function endBattle(won) {
     if (!save._currentStreak) save._currentStreak = 0;
     save._currentStreak++;
     if (save._currentStreak > save.stats.bestStreak) save.stats.bestStreak = save._currentStreak;
+    // Win-streak VP bonus: +5 per consecutive win, max +30
+    const streak = save._currentStreak;
+    const streakBonus = streak > 1 ? Math.min(streak * 5, 30) : 0;
+    save.vp += streakBonus;
     // Guild XP from battle win
     if (typeof addGuildXp === "function") addGuildXp(30);
     if (typeof addGuildChat === "function" && save.guild) addGuildChat("⚔️", `A ranked battle was won against ${battle.opponentName}!`);
@@ -2989,8 +3021,11 @@ function endBattle(won) {
     <div class="item"><span>Roster XP</span> <span>+${xpReward} (x3)</span></div>
     <div class="item"><span>Gold</span> <span>+${format(goldReward)}</span></div>
   `;
-  document.getElementById("end-vp").textContent = (vpChange > 0 ? "+" : "") + format(vpChange) + " VP";
-  document.getElementById("end-vp").className = "vp-change " + (vpChange > 0 ? "pos" : "neg");
+  const totalVpChange = vpChange + (won && save._currentStreak > 1 ? Math.min(save._currentStreak * 5, 30) : 0);
+  const streakBonus = won && save._currentStreak > 1 ? Math.min(save._currentStreak * 5, 30) : 0;
+  const vpText = (totalVpChange > 0 ? "+" : "") + format(totalVpChange) + " VP" + (streakBonus > 0 ? ` <span style="color:var(--warn);font-size:13px;">(+${streakBonus} streak bonus, ${save._currentStreak} streak!)</span>` : "");
+  document.getElementById("end-vp").innerHTML = vpText;
+  document.getElementById("end-vp").className = "vp-change " + (totalVpChange > 0 ? "pos" : "neg");
   document.getElementById("end-rank").textContent = `Now ${format(save.vp)} VP — ${rankForVP(save.vp)}`;
 
   setTimeout(() => show("screen-end"), 600);
