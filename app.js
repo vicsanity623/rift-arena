@@ -1032,7 +1032,7 @@ function getMonData(uid) {
     atk: finalAtk,
     def: finalDef,
     spd: finalSpd,
-    overallAffinity: Math.round(Math.max(finalHp, finalAtk, finalDef, finalSpd) / 4),
+    overallAffinity: Math.round((finalHp + finalAtk + finalDef + finalSpd) / 4),
     item: mSave.heldItem, sigName: def[8], shape: def[9],
     level: lvl, xp: mSave.xp, onExpedition: mSave.onExpedition,
     maxXp: getMonMaxXp(lvl),
