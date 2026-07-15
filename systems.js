@@ -1829,9 +1829,10 @@ function showDungeonSelect(container) {
   </div>`;
 
   DUNGEON_DEFS.forEach((dd, idx) => {
-    const avgLevel = Math.max(1, Math.floor(save.mons.reduce((s, m) => {
-      const d = getMonData(m.uid); return s + d.level;
-    }, 0) / Math.max(1, save.mons.length)));
+    const sortedLevels = save.mons.map(m => getMonData(m.uid).level).sort((a, b) => b - a);
+    const top3Avg = Math.max(1, Math.floor(sortedLevels.slice(0, 3).reduce((s, l) => s + l, 0) / Math.min(3, sortedLevels.length)));
+    const avgLevel = top3Avg; 
+    
     const locked = avgLevel < dd.minLevel;
     const hasCleared = save.dungeonProgress && save.dungeonProgress[dd.id];
     const clearedLabel = hasCleared ? "✓ Cleared" : `${dd.floors} Floors`;
