@@ -2563,6 +2563,7 @@ function startJourney(uid) {
   };
 
   show("screen-journey");
+  setCreatureSprite(document.getElementById("journey-runner"), mData.baseId, mData.evolved);
   renderJourneyHUD();
   spawnJourneyStage();
 }
@@ -2580,6 +2581,7 @@ function renderJourneyHUD() {
 
 function spawnJourneyStage() {
   if (!journeyState) return;
+  show("screen-journey");
   journeyState.currentEnemyIdx = 0;
   journeyState.encounterLocked = false;
 
@@ -2682,7 +2684,8 @@ function enterJourneyBattle() {
   const bl = document.getElementById("battle-log");
   if (bl) bl.textContent = "";
 
-  // Build player creature data
+  // Re-fetch creature data to sync level-ups and stat changes
+  journeyState.creature = getMonData(journeyState.uid);
   const playerMon = journeyState.creature;
   playerMon.hp = journeyState.hp;
   playerMon.effDef = Math.round(playerMon.def * (playerMon.item === "ironscale" ? 1.15 : 1));
@@ -2754,6 +2757,25 @@ function handleJourneyBattleEnd(won) {
     journeyState.totalGems += gemReward;
     journeyState.totalXp += xpReward;
 
+    // Material drop chance (each tier independently)
+    const matMult = 1 + (journeyState.stage - 1) * 0.1;
+    let matDropped = null;
+    if (Math.random() < 0.4 * matMult) {
+      const pool = ["iron_ore", "leather", "cloth"];
+      matDropped = pool[Math.floor(Math.random() * pool.length)];
+    } else if (Math.random() < 0.2 * matMult) {
+      const pool = ["crystal_shard", "essence_fire", "essence_water", "essence_nature"];
+      matDropped = pool[Math.floor(Math.random() * pool.length)];
+    } else if (journeyState.stage >= 3 && Math.random() < 0.05 * matMult) {
+      const pool = ["dragon_scale", "rift_core"];
+      matDropped = pool[Math.floor(Math.random() * pool.length)];
+    }
+    if (matDropped) {
+      if (!save.bag[matDropped]) save.bag[matDropped] = 0;
+      save.bag[matDropped]++;
+      if (typeof trackAchievement === "function") trackAchievement("materials_found", 1);
+    }
+
     save.gold += goldReward;
     save.gems += gemReward;
     save.playerXp += xpReward;
@@ -2779,7 +2801,9 @@ function handleJourneyBattleEnd(won) {
 
     const log = document.getElementById("journey-log");
     if (log) {
-      log.innerHTML = `Victory! +${goldReward}🪙 +${gemReward}💎 +${xpReward}XP`;
+      let logMsg = `Victory! +${goldReward}🪙 +${gemReward}💎 +${xpReward}XP`;
+      if (matDropped) logMsg += ` +${ITEMS[matDropped]?.name || matDropped}`;
+      log.innerHTML = logMsg;
     }
 
     // Check if all enemies in stage defeated
@@ -2805,8 +2829,10 @@ function journeyStageCleared() {
   journeyState.stage++;
   setHighestStageReached(journeyState.stage);
 
-  // Refill creature HP to full
-  journeyState.hp = journeyState.maxHp;
+  // Sync creature data and refill HP to full
+  journeyState.creature = getMonData(journeyState.uid);
+  journeyState.hp = journeyState.creature.baseHp;
+  journeyState.maxHp = journeyState.creature.baseHp;
 
   const field = document.getElementById("journey-field");
   if (!field) return;
