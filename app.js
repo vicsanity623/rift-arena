@@ -920,7 +920,7 @@ let save = (function () {
 function saveGame() { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); }
 
 // --- STAMINA SYSTEM ---
-const STAMINA_COST = { battle: 10, survival: 15, tournament: 20, explore: 5, dojo: 5, dungeon: 15 };
+const STAMINA_COST = { battle: 2, survival: 4, tournament: 4, explore: 1, dojo: 1, dungeon: 1 };
 const STAMINA_REGEN_MS = 5 * 60 * 1000; // 5 minutes
 
 function ensureStaminaRegen() {
