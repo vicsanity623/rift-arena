@@ -948,3 +948,184 @@ select.btn.ghost option { background: var(--bg); color: white; }
 .badge.t-volt { color: var(--volt); }
 .badge.t-stone { color: var(--stone); }
 .badge.t-gale { color: var(--gale); }
+
+/* ============================= JOURNEY MODE ============================= */
+.journey-hud {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  margin-bottom: 8px;
+}
+.journey-stage-badge {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--gold);
+  background: var(--gold-soft);
+  padding: 4px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--gold-dim);
+}
+.journey-creature-hp {
+  flex: 1;
+  min-width: 0;
+}
+.journey-creature-name {
+  font-size: 11px;
+  font-weight: 700;
+  display: block;
+  margin-bottom: 2px;
+}
+.journey-enemy-count {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--danger);
+  font-weight: 700;
+}
+.journey-field {
+  position: relative;
+  flex: 1;
+  min-height: 200px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #1a1a3a 0%, #0f0d1c 100%);
+  border: 1px solid var(--line);
+  margin-bottom: 8px;
+}
+.journey-bg-scroll {
+  position: absolute;
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(90deg, transparent, transparent 40px, rgba(255,255,255,0.02) 40px, rgba(255,255,255,0.02) 42px),
+    radial-gradient(ellipse at 50% 80%, rgba(100,100,200,0.05), transparent 60%);
+  background-size: auto, auto;
+  animation: journeyScroll 2s linear infinite;
+  pointer-events: none;
+}
+@keyframes journeyScroll {
+  0% { background-position: 0 0, 0 0; }
+  100% { background-position: 40px 0, 0 0; }
+}
+.journey-runner {
+  position: absolute;
+  left: 30px;
+  bottom: 30px;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  z-index: 3;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  transition: transform 0.2s ease;
+  animation: runnerBob 1s ease-in-out infinite;
+}
+@keyframes runnerBob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+.journey-enemy-sprite {
+  position: absolute;
+  right: 30px;
+  bottom: 60px;
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  z-index: 3;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0;
+  animation: enemyAppear 0.5s ease forwards;
+  box-shadow: 0 0 20px rgba(255,92,108,0.3);
+}
+@keyframes enemyAppear {
+  0% { opacity: 0; transform: translateX(40px) scale(0.5); }
+  100% { opacity: 1; transform: translateX(0) scale(1); }
+}
+.journey-enemy-sprite.defeated {
+  animation: enemyDefeat 0.5s ease forwards;
+}
+@keyframes enemyDefeat {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.3) translateY(20px); }
+}
+.journey-enemy-sprite.boss {
+  width: 90px;
+  height: 90px;
+  box-shadow: 0 0 30px rgba(230,185,77,0.5);
+}
+.journey-log {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 12px;
+  height: 48px;
+  overflow-y: auto;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+  line-height: 1.4;
+  font-family: var(--mono);
+}
+.journey-actions {
+  display: flex;
+  gap: 8px;
+}
+.journey-actions .btn {
+  flex: 1;
+}
+.journey-combat-btn {
+  background: linear-gradient(135deg, #f2cd6b, var(--gold));
+  color: #241a04;
+  border: none;
+  border-radius: 14px;
+  padding: 14px;
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 15px;
+  cursor: pointer;
+}
+.journey-combat-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.journey-combat-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.journey-creature-hp .hpbar-fill { background: var(--safe); }
+.journey-creature-hp .hpbar-fill.mid { background: var(--warn); }
+.journey-creature-hp .hpbar-fill.low { background: var(--danger); }
+.journey-stage-transition {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  animation: fadein 0.3s ease;
+}
+.journey-stage-transition h2 {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 28px;
+  color: var(--gold);
+  text-shadow: 0 0 20px rgba(230,185,77,0.4);
+}
+.journey-stage-transition p {
+  color: var(--text-dim);
+  font-size: 14px;
+}
+.journey-stage-coins {
+  font-family: var(--mono);
+  font-size: 16px;
+  color: var(--warn);
+}

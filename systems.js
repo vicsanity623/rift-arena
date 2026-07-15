@@ -2490,3 +2490,393 @@ function initForgeTabs() {
   if (tabCraft) tabCraft.onclick = showCraftTab;
   if (tabEquip) tabEquip.onclick = showEquipTab;
 }
+
+/* ============================= JOURNEY MODE ============================= */
+let journeyState = null;
+
+const JOURNEY_STAGE_ENEMIES = 4;
+const JOURNEY_BOSS_INTERVAL = 5;
+
+function getHighestStageReached() {
+  return save.highestStageReached || 1;
+}
+
+function setHighestStageReached(stage) {
+  if (stage > (save.highestStageReached || 0)) {
+    save.highestStageReached = stage;
+    saveGame();
+  }
+}
+
+function initJourneySelect() {
+  const grid = document.getElementById("journey-select-grid");
+  if (!grid) return;
+  grid.innerHTML = "";
+
+  save.mons.forEach(mSave => {
+    if (mSave.onExpedition) return;
+    const m = getMonData(mSave.uid);
+    const card = document.createElement("div");
+    card.className = "cmon-card";
+    card.dataset.uid = m.uid;
+    const passive = getPassive(m.type);
+    card.innerHTML = `
+      <div class="row1"><div class="sprite-thumb" id="journey-sel-sprite-${m.uid}"></div>
+      <div><div class="name">${m.name} <span class="badge">Lv.${m.level}</span></div><div class="type">${m.type}${passive ? ` ${passive.icon}` : ''}</div></div></div>
+      <div class="stats">HP ${m.baseHp} · ATK ${m.atk} · DEF ${m.def} · SPD ${m.spd}</div>
+    `;
+    card.onclick = () => {
+      grid.querySelectorAll(".cmon-card").forEach(c => c.classList.remove("picked"));
+      card.classList.add("picked");
+      document.getElementById("btn-journey-start").disabled = false;
+      document.getElementById("btn-journey-start").dataset.uid = m.uid;
+    };
+    grid.appendChild(card);
+    setCreatureSprite(document.getElementById("journey-sel-sprite-" + m.uid), m.baseId, m.evolved);
+  });
+}
+
+function startJourney(uid) {
+  if (!uid) return;
+  const staminaCost = 3;
+  if (typeof deductStamina === "function" && !deductStamina(staminaCost)) {
+    return showModal({ icon: "⚡", title: "Not Enough Stamina", message: `Need ${staminaCost} stamina for Journey. Regen: 1 per 5 min.` });
+  }
+
+  const mData = getMonData(uid);
+  const stage = getHighestStageReached();
+
+  journeyState = {
+    uid: uid,
+    creature: mData,
+    stage: stage,
+    hp: mData.baseHp,
+    maxHp: mData.baseHp,
+    enemiesDefeated: 0,
+    totalGold: 0,
+    totalGems: 0,
+    totalXp: 0,
+    over: false,
+    stageEnemies: [],
+    currentEnemyIdx: 0,
+    encounterLocked: false
+  };
+
+  show("screen-journey");
+  renderJourneyHUD();
+  spawnJourneyStage();
+}
+
+function renderJourneyHUD() {
+  if (!journeyState) return;
+  document.getElementById("journey-stage-num").textContent = journeyState.stage;
+  document.getElementById("journey-creature-name").textContent = journeyState.creature.name;
+  const hpPct = Math.max(0, (journeyState.hp / journeyState.maxHp) * 100);
+  const hpEl = document.getElementById("journey-creature-hp");
+  hpEl.style.width = hpPct + "%";
+  hpEl.className = "hpbar-fill" + (hpPct <= 25 ? " low" : hpPct <= 50 ? " mid" : "");
+  document.getElementById("journey-enemy-count").textContent = `⚔️ x${journeyState.enemiesDefeated}`;
+}
+
+function spawnJourneyStage() {
+  if (!journeyState) return;
+  journeyState.currentEnemyIdx = 0;
+  journeyState.encounterLocked = false;
+
+  const baseLvl = Math.max(1, journeyState.stage);
+  const isBossStage = journeyState.stage % JOURNEY_BOSS_INTERVAL === 0;
+
+  const enemies = [];
+  const numEnemies = isBossStage ? 1 : JOURNEY_STAGE_ENEMIES;
+
+  for (let i = 0; i < numEnemies; i++) {
+    const level = baseLvl + (isBossStage ? 2 : Math.floor(Math.random() * 3));
+    const pool = ROSTER_DEF.map(r => r[0]);
+    const id = pool[Math.floor(Math.random() * pool.length)];
+    enemies.push({ id, level, defeated: false });
+  }
+
+  journeyState.stageEnemies = enemies;
+
+  const field = document.getElementById("journey-field");
+  if (!field) return;
+
+  // Remove old transition overlay and enemy sprites
+  field.querySelectorAll(".journey-stage-transition, .journey-enemy-sprite").forEach(el => el.remove());
+
+  // Show stage transition overlay
+  const transition = document.createElement("div");
+  transition.className = "journey-stage-transition";
+  transition.innerHTML = `
+    <h2>${isBossStage ? "👑 BOSS STAGE" : "Stage " + journeyState.stage}</h2>
+    <p>${isBossStage ? "A powerful boss awaits!" : numEnemies + " enemies ahead"}</p>
+    <div class="journey-stage-coins">🪙 ${journeyState.totalGold} collected</div>
+  `;
+  field.appendChild(transition);
+
+  setTimeout(() => {
+    transition.remove();
+    journeyState.encounterLocked = false;
+    spawnNextEnemy();
+  }, 2000);
+
+  renderJourneyHUD();
+
+  // Update journey log
+  const log = document.getElementById("journey-log");
+  if (log) {
+    log.innerHTML = `Stage ${journeyState.stage} — ${isBossStage ? "A boss blocks your path!" : numEnemies + " foes spotted ahead!"}`;
+  }
+}
+
+function spawnNextEnemy() {
+  if (!journeyState || journeyState.over) return;
+
+  const enemies = journeyState.stageEnemies;
+  const idx = enemies.findIndex(e => !e.defeated);
+  if (idx === -1) {
+    journeyStageCleared();
+    return;
+  }
+
+  journeyState.currentEnemyIdx = idx;
+  const enemy = enemies[idx];
+  const foeData = ROSTER_DEF.find(r => r[0] === enemy.id);
+  if (!foeData) return;
+  const isBoss = journeyState.stage % JOURNEY_BOSS_INTERVAL === 0;
+
+  const field = document.getElementById("journey-field");
+  if (!field) return;
+
+  field.querySelectorAll(".journey-enemy-sprite").forEach(el => el.remove());
+
+  const enemyEl = document.createElement("div");
+  enemyEl.className = "journey-enemy-sprite" + (isBoss ? " boss" : "");
+  enemyEl.id = "journey-enemy-sprite";
+  field.appendChild(enemyEl);
+  setCreatureSprite(enemyEl, enemy.id, false);
+
+  const log = document.getElementById("journey-log");
+  if (log) {
+    log.innerHTML = `${foeData[1]} (Lv.${enemy.level}) appears! Prepare for battle!`;
+  }
+
+  const actions = document.getElementById("journey-actions");
+  if (actions) {
+    actions.innerHTML = `<button class="journey-combat-btn" id="btn-journey-fight">⚔️ Fight!</button>`;
+    document.getElementById("btn-journey-fight").onclick = () => enterJourneyBattle();
+  }
+}
+
+function enterJourneyBattle() {
+  if (!journeyState || journeyState.encounterLocked) return;
+  journeyState.encounterLocked = true;
+
+  const enemy = journeyState.stageEnemies[journeyState.currentEnemyIdx];
+  if (!enemy) return;
+
+  awaitingInput = true;
+  setWeather("none", 0);
+  const ap = document.getElementById("action-panel");
+  if (ap) ap.innerHTML = "";
+  const bl = document.getElementById("battle-log");
+  if (bl) bl.textContent = "";
+
+  // Build player creature data
+  const playerMon = journeyState.creature;
+  playerMon.hp = journeyState.hp;
+  playerMon.effDef = Math.round(playerMon.def * (playerMon.item === "ironscale" ? 1.15 : 1));
+  playerMon.itemUsed = false;
+  playerMon.fainted = false;
+  playerMon.statusEffects = [];
+  playerMon.statusAtkMult = 1;
+  playerMon.statusSkipTurns = 0;
+  playerMon._baseSpd = playerMon.spd;
+  playerMon._baseDef = playerMon.def;
+  triggerPassiveOnInit(playerMon);
+
+  const foe = instantiateFoe(enemy.id, enemy.level);
+  const isBoss = journeyState.stage % JOURNEY_BOSS_INTERVAL === 0;
+  if (isBoss) {
+    foe.baseHp = Math.floor(foe.baseHp * 3);
+    foe.hp = foe.baseHp;
+    foe.atk = Math.floor(foe.atk * 2);
+    foe.def = Math.floor(foe.def * 2);
+    foe.spd = Math.floor(foe.spd * 1.5);
+    foe.effDef = Math.round(foe.def * (foe.item === "ironscale" ? 1.15 : 1));
+    foe._baseSpd = foe.spd;
+    foe._baseDef = foe.def;
+    triggerPassiveOnInit(foe);
+  }
+
+  battle = {
+    player: [playerMon],
+    foe: [foe],
+    pIndex: 0,
+    fIndex: 0,
+    opponentName: foe.name,
+    personality: "balanced",
+    over: false,
+    journey: true,
+    pCombo: [],
+    fCombo: []
+  };
+
+  show("screen-battle");
+  document.getElementById("battle-log").textContent = `Journey Stage ${journeyState.stage} — ${foe.name} appears!`;
+  renderBattle(true);
+}
+
+function handleJourneyBattleEnd(won) {
+  if (!journeyState || journeyState.over) return;
+
+  // Sync creature HP back from battle state
+  if (battle && battle.player && battle.player[0]) {
+    journeyState.hp = battle.player[0].hp;
+  }
+
+  if (won) {
+    const enemy = journeyState.stageEnemies[journeyState.currentEnemyIdx];
+    if (enemy) enemy.defeated = true;
+
+    // Mark defeated on field
+    const enemyEl = document.getElementById("journey-enemy-sprite");
+    if (enemyEl) enemyEl.classList.add("defeated");
+
+    journeyState.enemiesDefeated++;
+
+    const stageMult = 1 + (journeyState.stage - 1) * 0.1;
+    const goldReward = Math.round((20 + Math.floor(Math.random() * 15)) * stageMult);
+    const gemReward = Math.floor(Math.random() * 3);
+    const xpReward = Math.round((40 + journeyState.stage * 10) * stageMult);
+
+    journeyState.totalGold += goldReward;
+    journeyState.totalGems += gemReward;
+    journeyState.totalXp += xpReward;
+
+    save.gold += goldReward;
+    save.gems += gemReward;
+    save.playerXp += xpReward;
+
+    while (save.playerXp >= getPlayerMaxXp(save.playerLevel)) {
+      save.playerXp -= getPlayerMaxXp(save.playerLevel);
+      save.playerLevel++;
+      save.gems += 50;
+    }
+
+    const mSave = save.mons.find(m => m.uid === journeyState.uid);
+    if (mSave) {
+      mSave.xp += xpReward;
+      while (mSave.xp >= getMonMaxXp(mSave.level)) {
+        mSave.xp -= getMonMaxXp(mSave.level);
+        mSave.level++;
+      }
+    }
+
+    saveGame();
+
+    renderJourneyHUD();
+
+    const log = document.getElementById("journey-log");
+    if (log) {
+      log.innerHTML = `Victory! +${goldReward}🪙 +${gemReward}💎 +${xpReward}XP`;
+    }
+
+    // Check if all enemies in stage defeated
+    const remaining = journeyState.stageEnemies.some(e => !e.defeated);
+    if (!remaining) {
+      setTimeout(() => journeyStageCleared(), 1500);
+    } else {
+      journeyState.encounterLocked = false;
+      setTimeout(() => {
+        show("screen-journey");
+        spawnNextEnemy();
+      }, 2000);
+    }
+  } else {
+    journeyDefeated();
+  }
+}
+
+function journeyStageCleared() {
+  if (!journeyState) return;
+
+  // Advance to next stage
+  journeyState.stage++;
+  setHighestStageReached(journeyState.stage);
+
+  // Refill creature HP to full
+  journeyState.hp = journeyState.maxHp;
+
+  const field = document.getElementById("journey-field");
+  if (!field) return;
+
+  const transition = document.createElement("div");
+  transition.className = "journey-stage-transition";
+  transition.innerHTML = `
+    <h2>✦ Stage ${journeyState.stage - 1} Complete!</h2>
+    <p>Your creature is fully healed for the next stage.</p>
+    <div class="journey-stage-coins">🪙 ${journeyState.totalGold} · 💎 ${journeyState.totalGems} · ✨ ${journeyState.totalXp}XP</div>
+  `;
+  field.appendChild(transition);
+
+  const log = document.getElementById("journey-log");
+  if (log) {
+    log.innerHTML = `Stage ${journeyState.stage - 1} cleared! Advancing to Stage ${journeyState.stage}...`;
+  }
+
+  const actionsEl = document.getElementById("journey-actions");
+  if (actionsEl) actionsEl.innerHTML = "";
+
+  setTimeout(() => {
+    transition.remove();
+    spawnJourneyStage();
+  }, 2500);
+}
+
+function journeyDefeated() {
+  if (!journeyState) return;
+  journeyState.over = true;
+
+  setHighestStageReached(journeyState.stage);
+
+  saveGame();
+
+  const container = document.getElementById("journey-end-rewards");
+  const banner = document.getElementById("journey-end-banner");
+  if (banner) {
+    banner.textContent = "Defeated at Stage " + journeyState.stage;
+    banner.className = "end-banner lose";
+  }
+  if (container) {
+    container.innerHTML = `
+      <div class="item">🪙 Gold Earned: ${formatNum(journeyState.totalGold)}</div>
+      <div class="item">💎 Gems Earned: ${formatNum(journeyState.totalGems)}</div>
+      <div class="item">✨ XP Earned: ${formatNum(journeyState.totalXp)}</div>
+      <div class="item" style="border-top:1px solid var(--line); padding-top:6px; margin-top:4px; color:var(--gold);">⚔️ Enemies Defeated: ${journeyState.enemiesDefeated}</div>
+    `;
+  }
+
+  show("screen-journey-end");
+
+  document.getElementById("btn-journey-retry").onclick = () => {
+    journeyState = null;
+    initJourneySelect();
+    show("screen-journey-select");
+  };
+}
+
+function updateJourneyDash() {
+  const el = document.getElementById("journey-dash");
+  if (!el) return;
+  const hs = getHighestStageReached();
+  if (journeyState && !journeyState.over) {
+    el.textContent = `Stage ${journeyState.stage}`;
+  } else if (hs > 1) {
+    el.textContent = `Stage ${hs}`;
+  } else {
+    el.textContent = "Start";
+  }
+}
+
+setInterval(updateJourneyDash, 1000);
