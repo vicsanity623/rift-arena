@@ -1954,11 +1954,8 @@ function enterDungeonFloor() {
 
   let oppIds;
   if (isBoss) {
-    oppIds = [...dd.bossIds];
-    while (oppIds.length < 3) {
-      const extra = ROSTER_DEF.map(r => r[0]).sort(() => Math.random() - 0.5).filter(id => !oppIds.includes(id));
-      oppIds.push(extra[0]);
-    }
+    // MODIFIED: Only spawn 1 single boss creature instead of padding the team to 3
+    oppIds = [dd.bossIds[0]]; 
   } else {
     let pool = [];
     if (dd.theme && THEMED_ROSTER[dd.theme]) {
@@ -1999,10 +1996,33 @@ function enterDungeonFloor() {
 
   battle = {
     player: ds.player,
-    foe: oppIds.map(id => instantiateFoe(id, baseLvl)),
+    // MODIFIED: If it's a boss floor, apply the 10x stat scaling and trigger its evolved form
+    foe: oppIds.map(id => {
+      const f = instantiateFoe(id, baseLvl);
+      if (isBoss) {
+        f.name = dd.bossName; // Set name to the actual boss name (e.g. Magma Tyrant)
+        f.evolved = true;     // Forces the battle renderer to load its _evolved.PNG sprite!
+        
+        // Scale all base stats by 10x
+        f.baseHp = Math.floor(f.baseHp * 10);
+        f.hp = f.baseHp;      // Fully heal to the new 10x HP pool
+        f.atk = Math.floor(f.atk * 10);
+        f.def = Math.floor(f.def * 10);
+        f.spd = Math.floor(f.spd * 10);
+        
+        // Recalculate secondary stats based on the new 10x values
+        f.effDef = Math.round(f.def * (f.item === "ironscale" ? 1.15 : 1));
+        f._baseSpd = f.spd;
+        f._baseDef = f.def;
+        
+        // Re-initialize its passive to scale with its new evolved level status
+        if (typeof triggerPassiveOnInit === "function") triggerPassiveOnInit(f);
+      }
+      return f;
+    }),
     pIndex: ds.pIndex,
     fIndex: 0,
-    opponentName: trainerName + ` (Floor ${currentFloor})`,
+    opponentName: trainerName + (isBoss ? "" : ` (Floor ${currentFloor})`),
     personality: isBoss ? "aggressive" : "balanced",
     over: false,
     dungeon: true,
