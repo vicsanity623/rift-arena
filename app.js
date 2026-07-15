@@ -921,7 +921,7 @@ function saveGame() { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); }
 
 // --- STAMINA SYSTEM ---
 const STAMINA_COST = { battle: 10, survival: 15, tournament: 20, explore: 5, dojo: 5, dungeon: 15 };
-const STAMINA_REGEN_MS = 5 * 60 * 1000; // 1 per 5 minutes
+const STAMINA_REGEN_MS = 5 * 60 * 1000; // 5 minutes
 
 function ensureStaminaRegen() {
   if (save.stamina >= save.staminaMax) {
@@ -931,7 +931,8 @@ function ensureStaminaRegen() {
   const elapsed = Date.now() - save.lastStaminaRegen;
   const regened = Math.floor(elapsed / STAMINA_REGEN_MS);
   if (regened > 0) {
-    save.stamina = Math.min(save.staminaMax, save.stamina + regened);
+    // MODIFIED: Multiply the elapsed intervals (regened) by 10 instead of 1
+    save.stamina = Math.min(save.staminaMax, save.stamina + (regened * 10));
     save.lastStaminaRegen += regened * STAMINA_REGEN_MS;
     saveGame();
   }
