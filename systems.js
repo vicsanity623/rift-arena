@@ -85,6 +85,7 @@ function claimDailyLogin() {
 
   save.dailyLogin.claimed = true;
   saveGame();
+  if (typeof spawnClaimBurst === "function") spawnClaimBurst("🎁");
   refreshHome();
   return { reward, streak: save.dailyLogin.streak };
 }
@@ -226,6 +227,13 @@ function initQuestsUI() {
   const container = document.getElementById("quests-content");
   container.innerHTML = "";
 
+  const readyCount = save.dailyQuests.quests.filter(q => q.progress >= q.target && !q.claimed).length;
+  const liveCounter = document.createElement("div");
+  liveCounter.className = "quest-counter" + (readyCount > 0 ? " pulse" : "");
+  liveCounter.id = "quest-live-counter";
+  liveCounter.innerHTML = `📋 <span id="quest-ready-count">${readyCount}</span> ready to claim`;
+  container.appendChild(liveCounter);
+
   save.dailyQuests.quests.forEach((q, i) => {
     const done = q.progress >= q.target;
     const claimed = q.claimed;
@@ -238,15 +246,15 @@ function initQuestsUI() {
         <div style="flex:1;">
           <div style="font-weight:bold; font-size:14px;">${q.desc}</div>
           <div class="quest-progress" style="margin-top:6px;">
-            <div class="xp-bar" style="width:100%;"><div class="xp-fill" style="width:${pct}%;"></div></div>
-            <div style="font-size:11px; color:var(--text-dim); font-family:var(--mono); margin-top:2px;">${q.progress}/${q.target}</div>
+            <div class="xp-bar" style="width:100%;"><div class="xp-fill" id="quest-fill-${i}" style="width:${pct}%;"></div></div>
+            <div style="font-size:11px; color:var(--text-dim); font-family:var(--mono); margin-top:2px;"><span id="quest-progress-${i}">${q.progress}</span>/<span id="quest-target-${i}">${q.target}</span></div>
           </div>
           <div style="font-size:11px; color:var(--gold); margin-top:4px;">
             <span>🪙 ${formatNum(q.reward.gold)}</span>
             <span style="margin-left:8px;">💎 ${formatNum(q.reward.gems)}</span>
           </div>
         </div>
-        <button class="btn ghost quest-claim-btn" style="width:auto; padding:8px 16px; flex-shrink:0;" ${!done || claimed ? 'disabled' : ''}>
+        <button class="btn ghost quest-claim-btn" id="quest-claim-btn-${i}" style="width:auto; padding:8px 16px; flex-shrink:0;" ${!done || claimed ? 'disabled' : ''}>
           ${claimed ? "Claimed" : done ? "Claim" : "—"}
         </button>
       </div>
@@ -261,6 +269,77 @@ function initQuestsUI() {
 
   const allClaimed = save.dailyQuests.quests.every(q => q.claimed);
   document.getElementById("quests-dash-status").textContent = allClaimed ? "Done!" : save.dailyQuests.quests.filter(q => q.progress >= q.target && !q.claimed).length + " ready";
+  updateQuestDashBadge();
+}
+
+function updateQuestLiveCounter() {
+  if (!save.dailyQuests) return;
+  const readyCount = save.dailyQuests.quests.filter(q => q.progress >= q.target && !q.claimed).length;
+  const countEl = document.getElementById("quest-ready-count");
+  if (countEl) {
+    countEl.textContent = readyCount;
+    const parent = countEl.closest(".quest-counter");
+    if (parent) {
+      parent.classList.remove("pulse");
+      void parent.offsetWidth;
+      if (readyCount > 0) parent.classList.add("pulse");
+    }
+  }
+  save.dailyQuests.quests.forEach((q, i) => {
+    const progressEl = document.getElementById("quest-progress-" + i);
+    const fillEl = document.getElementById("quest-fill-" + i);
+    const btnEl = document.getElementById("quest-claim-btn-" + i);
+    if (progressEl) progressEl.textContent = q.progress;
+    if (fillEl) fillEl.style.width = Math.min(100, (q.progress / q.target) * 100) + "%";
+    if (btnEl) {
+      const done = q.progress >= q.target;
+      btnEl.disabled = !done || q.claimed;
+      btnEl.textContent = q.claimed ? "Claimed" : done ? "Claim" : "—";
+      if (done && !q.claimed) {
+        btnEl.onclick = () => claimQuestReward(i);
+      }
+    }
+  });
+  updateQuestDashBadge();
+}
+
+setInterval(updateQuestLiveCounter, 3000);
+
+function spawnClaimBurst(icon) {
+  const overlay = document.createElement("div");
+  overlay.className = "claim-burst";
+  const emojis = ["✨", "⭐", icon || "🌟", "💫", "🎉"];
+  for (let i = 0; i < 8; i++) {
+    const star = document.createElement("div");
+    star.className = "claim-star";
+    star.textContent = emojis[i % emojis.length];
+    const angle = (i / 8) * 360;
+    const dist = 80 + Math.random() * 60;
+    const rad = angle * Math.PI / 180;
+    star.style.setProperty("--cx", Math.cos(rad) * dist + "px");
+    star.style.setProperty("--cy", Math.sin(rad) * dist + "px");
+    star.style.animationDelay = (i * 0.05) + "s";
+    overlay.appendChild(star);
+  }
+  document.getElementById("app").appendChild(overlay);
+  setTimeout(() => overlay.remove(), 1200);
+}
+
+function updateQuestDashBadge() {
+  const ready = save.dailyQuests ? save.dailyQuests.quests.filter(q => q.progress >= q.target && !q.claimed).length : 0;
+  const card = document.getElementById("card-quests");
+  if (!card) return;
+  let badge = card.querySelector(".notif-badge");
+  if (ready > 0) {
+    if (!badge) {
+      badge = document.createElement("div");
+      badge.className = "notif-badge";
+      card.appendChild(badge);
+    }
+    badge.textContent = ready;
+  } else if (badge) {
+    badge.remove();
+  }
 }
 
 function claimQuestReward(index) {
@@ -271,6 +350,7 @@ function claimQuestReward(index) {
   save.gold += q.reward.gold;
   save.gems += q.reward.gems;
   saveGame();
+  spawnClaimBurst("📋");
   refreshHome();
   initQuestsUI();
   showModal({ icon: "📋", title: "Quest Complete!", message: `Rewards:<br>🪙 ${formatNum(q.reward.gold)} Gold<br>💎 ${formatNum(q.reward.gems)} Gems` });
