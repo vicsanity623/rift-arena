@@ -1180,6 +1180,10 @@ function refreshHome() {
     if (save.guild) guildDash.textContent = `Lv.${save.guild.level}`;
     else guildDash.textContent = "Create";
   }
+
+  // Notification badges
+  if (typeof updateQuestDashBadge === "function") updateQuestDashBadge();
+  if (typeof updateAchievementDashBadge === "function") updateAchievementDashBadge();
 }
 
 setInterval(() => {
@@ -3268,9 +3272,17 @@ function claimAchievement(id) {
   save.gems += ach.reward.gems;
   awardAllMasteryPoints(2);
   saveGame();
+  if (typeof spawnClaimBurst === "function") spawnClaimBurst("🏆");
   refreshHome();
   refreshAchievementsUI();
   showModal({ icon: "🏆", title: `Achievement Unlocked: ${ach.name}`, message: `Claimed ${ach.reward.gold} 🪙 and ${ach.reward.gems} 💎! +2 MP to all creatures!` });
+}
+
+let _achFilterCategory = "all";
+
+function getFilteredAchCategories() {
+  if (_achFilterCategory === "all") return Object.keys(ACHIEVEMENT_CATEGORIES);
+  return [ACHIEVEMENT_CATEGORIES[_achFilterCategory] ? _achFilterCategory : "all"].filter(k => k !== "all");
 }
 
 function refreshAchievementsUI() {
@@ -3278,9 +3290,20 @@ function refreshAchievementsUI() {
   if (!container) return;
 
   const unclaimed = getUnclaimedAchievements();
-  let html = "";
 
+  // Filter row
+  let filterHtml = `<div class="ach-filter-row">`;
+  filterHtml += `<button class="ach-filter-btn ${_achFilterCategory === 'all' ? 'active' : ''}" data-ach-filter="all">All</button>`;
   Object.keys(ACHIEVEMENT_CATEGORIES).forEach(catKey => {
+    const cat = ACHIEVEMENT_CATEGORIES[catKey];
+    const status = getCategoryStatus(catKey);
+    filterHtml += `<button class="ach-filter-btn ${_achFilterCategory === catKey ? 'active' : ''}" data-ach-filter="${catKey}" style="${_achFilterCategory === catKey ? `border-color:${cat.color};color:${cat.color};` : ''}">${cat.icon} ${cat.name} (${status.completed + status.claimed}/${status.total})</button>`;
+  });
+  filterHtml += `</div>`;
+  let html = filterHtml;
+
+  const catKeys = getFilteredAchCategories();
+  catKeys.forEach(catKey => {
     const cat = ACHIEVEMENT_CATEGORIES[catKey];
     const status = getCategoryStatus(catKey);
     const achs = getCategoryAchievements(catKey);
@@ -3326,9 +3349,34 @@ function refreshAchievementsUI() {
 
   container.innerHTML = html;
 
+  container.querySelectorAll(".ach-filter-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      _achFilterCategory = btn.dataset.achFilter;
+      refreshAchievementsUI();
+    });
+  });
+
   container.querySelectorAll(".btn-ach-claim").forEach(btn => {
     btn.addEventListener("click", () => claimAchievement(btn.dataset.achId));
   });
+  updateAchievementDashBadge();
+}
+
+function updateAchievementDashBadge() {
+  const unclaimed = getUnclaimedAchievements();
+  const card = document.getElementById("card-achievements");
+  if (!card) return;
+  let badge = card.querySelector(".notif-badge");
+  if (unclaimed > 0) {
+    if (!badge) {
+      badge = document.createElement("div");
+      badge.className = "notif-badge";
+      card.appendChild(badge);
+    }
+    badge.textContent = unclaimed;
+  } else if (badge) {
+    badge.remove();
+  }
 }
 
 function updateAchievementsDash() {
